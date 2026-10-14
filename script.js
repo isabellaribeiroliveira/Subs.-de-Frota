@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 const CFG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbxj8pW_yrKOodz7jnPlolRV6a_jBVxtlOfIaDDCjGnQ-hLjdpdicWKzx8EbS3Qn7nYK/exec',
+  API_URL: '',
   REFRESH_MS: 45000,     // atualização automática dos dados (ms)
   MAX_ANEXO_MB: 6,       // tamanho máximo de cada anexo
   MAX_ANEXOS: 5          // anexos por ocorrência
@@ -74,14 +74,14 @@ const CONCLUIDAS = ['validada', 'encerrada'];
 
 /* ------------------------- Estado ------------------------- */
 const state = {
-  boot: 'loading',            // loading | setup | login | app
+  boot: 'loading',            // loading | setup | login | newpass | app
   user: null,
   listas: { setores: [], linhas: [], veiculos: [], motoristas: [] },
   occs: [], lastSync: 0, syncing: false,
   route: 'home',              // colaborador: home | wizard | minhas | success
   minhasFiltro: 'todas',
   wiz: null, success: null, sheet: null, modal: null,
-  outbox: [], draftInfo: null, loginError: '', loginBusy: false, busy: false,
+  outbox: [], draftInfo: null, loginError: '', loginBusy: false, passError: '', passBusy: false, busy: false,
   qa: {
     view: 'dashboard', detail: null, showFilters: false, limit: 100,
     f: { q: '', from: '', to: '', status: '', setor: '', linha: '', motivo: '', impacto: '', subst: '' },
@@ -325,28 +325,46 @@ function renderSetup() {
       <h1>Falta conectar à planilha</h1>
       <p class="muted">O aplicativo está pronto, mas ainda não sabe onde guardar as ocorrências.</p>
       <ol class="steps">
-        <li>Siga o passo a passo do arquivo <b>SETUP.md</b> (cerca de 10 minutos).</li>
-        <li>Copie a URL do Web App gerada (termina com <code>/exec</code>).</li>
-        <li>Cole em <code>API_URL</code> no arquivo <code>config.js</code> e publique de novo.</li>
+        <li>Crie uma planilha no Google Sheets e abra <b>Extensões → Apps Script</b>.</li>
+        <li>Cole o conteúdo do arquivo <b>Code.gs</b>, execute a função <code>configurar</code> e publique como <b>App da Web</b>.</li>
+        <li>Copie a URL gerada (termina com <code>/exec</code>) e cole em <code>API_URL</code>, na linha 7 do arquivo <code>script.js</code>. Depois publique de novo.</li>
       </ol></section></main>`;
 }
 function renderLoading() { return `<main class="center-screen">${SWOOSH}<div class="loader-wrap">${LOGO}<div class="spinner"></div><p class="muted">Carregando…</p></div></main>`; }
 
 function renderLogin() {
-  const last = lsGet('univale_last_matricula', '') || '';
+  const last = state.loginMat || lsGet('univale_last_matricula', '') || '';
   return `<main class="center-screen">${SWOOSH}
     <section class="card auth-card">
       <div class="auth-logo">${LOGO}</div>
       <h1>Registro de Ocorrências</h1>
-      <p class="muted">Entre com sua matrícula e seu PIN.</p>
+      <p class="muted">Entre com sua matrícula e sua senha.</p>
       <label class="lbl" for="lg-m">Matrícula</label>
       <input id="lg-m" class="inp" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(last)}" placeholder="Sua matrícula" />
-      <label class="lbl" for="lg-p">PIN</label>
-      <div class="pin-wrap"><input id="lg-p" class="inp" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" />
-        <button type="button" class="eye" data-action="togglePin" aria-label="Mostrar PIN">👁</button></div>
+      <label class="lbl" for="lg-p">Senha</label>
+      <div class="pin-wrap"><input id="lg-p" class="inp" type="password" autocomplete="current-password" placeholder="Sua senha" />
+        <button type="button" class="eye" data-action="togglePin" data-for="lg-p" aria-label="Mostrar senha">👁</button></div>
       ${state.loginError ? `<div class="alert err" role="alert">${esc(state.loginError)}</div>` : ''}
       <button class="btn btn-primary btn-lg btn-block" data-action="login" ${state.loginBusy ? 'disabled' : ''}>${state.loginBusy ? '<span class="spinner sm"></span> Entrando…' : 'Entrar'}</button>
-      <p class="tiny muted center">Esqueceu o PIN? Procure a Qualidade.</p>
+      <p class="tiny muted center">Primeiro acesso? Digite sua matrícula também no campo senha. Em seguida você cria uma nova senha.</p>
+      <p class="tiny muted center">Esqueceu a senha? Procure a Qualidade para redefinir.</p>
+    </section></main>`;
+}
+function renderNewPass() {
+  const nome = state.user ? state.user.nome.split(' ')[0] : '';
+  return `<main class="center-screen">${SWOOSH}
+    <section class="card auth-card">
+      <div class="auth-logo">${LOGO}</div>
+      <h1>Crie sua senha</h1>
+      <p class="muted">Olá, ${esc(nome)}! Este é seu primeiro acesso. Escolha uma senha só sua, com pelo menos 6 caracteres.</p>
+      <label class="lbl" for="np1">Nova senha</label>
+      <div class="pin-wrap"><input id="np1" class="inp" type="password" autocomplete="new-password" placeholder="Mínimo de 6 caracteres" />
+        <button type="button" class="eye" data-action="togglePin" data-for="np1,np2" aria-label="Mostrar senha">👁</button></div>
+      <label class="lbl" for="np2">Repita a nova senha</label>
+      <input id="np2" class="inp" type="password" autocomplete="new-password" placeholder="Digite de novo" />
+      ${state.passError ? `<div class="alert err" role="alert">${esc(state.passError)}</div>` : ''}
+      <button class="btn btn-primary btn-lg btn-block" data-action="savePass" ${state.passBusy ? 'disabled' : ''}>${state.passBusy ? '<span class="spinner sm"></span> Salvando…' : 'Salvar senha e entrar'}</button>
+      <button class="btn btn-text btn-block" data-action="logout">Cancelar</button>
     </section></main>`;
 }
 
@@ -552,6 +570,7 @@ function render() {
   let html = '';
   if (state.boot === 'setup') html = renderSetup();
   else if (state.boot === 'loading') html = renderLoading();
+  else if (state.boot === 'newpass' && state.user) html = renderNewPass();
   else if (state.boot === 'login' || !state.user) html = renderLogin();
   else if (isQA()) html = (typeof renderQualidade === 'function') ? renderQualidade() : '';
   else if (state.route === 'wizard' && state.wiz) html = renderWizard();
@@ -707,18 +726,36 @@ async function addFiles(fileList, isPhoto) {
    AÇÕES
    ========================================================= */
 const ACTIONS = {
-  togglePin() { const i = document.getElementById('lg-p'); if (i) i.type = i.type === 'password' ? 'text' : 'password'; },
+  togglePin(ds) { String(ds.for || 'lg-p').split(',').forEach(id => { const i = document.getElementById(id); if (i) i.type = i.type === 'password' ? 'text' : 'password'; }); },
   async login() {
     if (state.loginBusy) return;
     const m = (document.getElementById('lg-m') || {}).value || '', p = (document.getElementById('lg-p') || {}).value || '';
-    if (!m.trim() || !p.trim()) { state.loginError = 'Informe matrícula e PIN.'; return render(); }
+    state.loginMat = m.trim();   // não perde a matrícula digitada se errar a senha
+    if (!m.trim() || !p.trim()) { state.loginError = 'Informe matrícula e senha.'; return render(); }
     state.loginBusy = true; state.loginError = ''; render();
-    const r = await API.call('login', { matricula: m.trim(), pin: p.trim() });
+    const r = await API.call('login', { matricula: m.trim(), senha: p.trim() });
     state.loginBusy = false;
     if (!r.ok) { state.loginError = r.message || 'Não foi possível entrar.'; return render(); }
     lsSet('univale_last_matricula', m.trim());
-    applySession(r.data); loadOutbox(); state.boot = 'app'; state.route = 'home';
-    state.qa.view = 'dashboard'; render(); startPolling(); flushOutbox();
+    if (r.data.primeiroAcesso) {            // 1º acesso: precisa criar a própria senha
+      API.Auth.set({ token: r.data.token, user: r.data.user });
+      state.user = r.data.user; state.passError = ''; state.boot = 'newpass'; return render();
+    }
+    enterApp(r.data);
+  },
+  async savePass() {
+    if (state.passBusy) return;
+    const a = (document.getElementById('np1') || {}).value || '', b = (document.getElementById('np2') || {}).value || '';
+    const fail = m => { state.passError = m; render(); };
+    if (a.length < 6) return fail('A senha precisa ter pelo menos 6 caracteres.');
+    if (a !== b) return fail('As duas senhas não são iguais.');
+    if (a.toLowerCase() === String(state.user.matricula).toLowerCase()) return fail('A nova senha não pode ser igual à matrícula.');
+    state.passBusy = true; state.passError = ''; render();
+    const r = await API.call('definirSenha', { nova: a });
+    state.passBusy = false;
+    if (!r.ok) { if (r.code === 'AUTH') return doLogout(r.message); return fail(r.message || 'Não foi possível salvar a senha.'); }
+    toast('Senha criada! Bem-vindo(a).');
+    enterApp(r.data);
   },
   logout() { doLogout(); },
   goHome() { state.route = 'home'; state.sheet = null; state.modal = null; refreshDraftInfo(); render(); },
@@ -757,6 +794,11 @@ const ACTIONS = {
   rmAnexo(ds) { state.wiz.anexos.splice(+ds.i, 1); render(); }
 };
 
+function enterApp(data) {
+  applySession(data); loadOutbox(); state.boot = 'app'; state.route = 'home';
+  state.qa.view = 'dashboard'; render(); startPolling(); flushOutbox();
+}
+
 function doLogout(msg) {
   clearInterval(pollTimer);
   if (state.user) lsDel(cacheKey());
@@ -791,6 +833,7 @@ function onKey(e) {
   if (e.key === 'Enter') {
     const t = e.target;
     if (t.id === 'lg-m' || t.id === 'lg-p') { e.preventDefault(); ACTIONS.login(); return; }
+    if (t.id === 'np1' || t.id === 'np2') { e.preventDefault(); ACTIONS.savePass(); return; }
     if (t.tagName === 'INPUT' && t.dataset.bind && state.wiz) { e.preventDefault(); wizNext(false); return; }
     if (t.matches && t.matches('[data-action]:not(button):not(a)')) { e.preventDefault(); t.click(); }
   }
@@ -819,6 +862,7 @@ async function init() {
   state.user = auth.user; loadCache(); refreshDraftInfo(); state.boot = 'app'; render();
   const r = await API.call('session');
   if (r.ok) { applySession(r.data); render(); startPolling(); flushOutbox(); }
+  else if (r.code === 'FIRST_ACCESS') { state.boot = 'newpass'; state.passError = ''; render(); }
   else if (r.code === 'AUTH') doLogout(r.message);
   else { toast('Sem conexão: mostrando os últimos dados salvos.'); startPolling(); }
 }

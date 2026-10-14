@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 const CFG = {
-  API_URL: '',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwk3FWBFRRrnY2PFUvUZxp-_T_KRw7K9C9bHN5jnK85_cAqtoickmjDh3nRvZ0MdeYD_w/exec',
   REFRESH_MS: 45000,     // atualização automática dos dados (ms)
   MAX_ANEXO_MB: 6,       // tamanho máximo de cada anexo
   MAX_ANEXOS: 5          // anexos por ocorrência

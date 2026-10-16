@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 const CFG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbxnt9oGcOZcuVTrsLZCb6npXoQYaCx8Jfu2ySs_mlLK7sHkrkrfSPf6-efBIxEm4yI5/exec',
+  API_URL: '',
   REFRESH_MS: 45000,     // atualização automática dos dados (ms)
   MAX_ANEXO_MB: 6,       // tamanho máximo de cada anexo
   MAX_ANEXOS: 5          // anexos por ocorrência
@@ -65,16 +65,27 @@ const TIPOS_IMPACTO = ['Atraso', 'Horário não cumprido', 'Viagem interrompida'
 const TIPOS_REMOCAO = ['Reboque', 'Guincho', 'Outro'];
 
 const STATUS = {
-  aguardando_lancamento: { qa: 'Aguardando nº do socorro', colab: 'Aguardando análise', tone: 'amber' },
-  em_analise:            { qa: 'Em análise',               colab: 'Em análise',         tone: 'blue' },
-  correcao_solicitada:   { qa: 'Correção solicitada',      colab: 'Correção solicitada', tone: 'orange' },
-  validada:              { qa: 'Validada',                 colab: 'Validada',           tone: 'green' },
-  encerrada:             { qa: 'Encerrada',                colab: 'Encerrada',          tone: 'gray' }
+  aguardando_manutencao: { qa: 'Aguardando Manutenção', colab: 'Aguardando análise', tone: 'amber' },
+  correcao_solicitada:   { qa: 'Correção solicitada',   colab: 'Correção solicitada', tone: 'orange' },
+  em_tratamento:         { qa: 'Em tratamento',         colab: 'Em andamento',        tone: 'blue' },
+  aguardando_qualidade:  { qa: 'Aguardando Qualidade',  colab: 'Em andamento',        tone: 'teal' },
+  encerrada:             { qa: 'Finalizada',            colab: 'Finalizada',          tone: 'green' }
 };
-const CONCLUIDAS = ['validada', 'encerrada'];
+const CONCLUIDAS = ['encerrada'];
+const EM_ANDAMENTO = ['aguardando_manutencao', 'em_tratamento', 'aguardando_qualidade'];
+const EQUIPES = ['manutencao', 'mecanica', 'transportes', 'qualidade'];
+const ROLE_LABEL = { colaborador: 'Colaborador', manutencao: 'Manutenção', mecanica: 'Mecânica', transportes: 'Transportes', qualidade: 'Qualidade' };
+// texto do status para as equipes: em tratamento mostra quem ainda falta
+function stageLabel(o) {
+  if (o.status === 'em_tratamento') {
+    const f = []; if (!o.mecanica_socorro) f.push('Mecânica'); if (o.transportes_lancado !== 'sim') f.push('Transportes');
+    return 'Aguardando ' + f.join(' e ');
+  }
+  return (STATUS[o.status] || {}).qa || o.status;
+}
 
 /* Ícones Lucide (ISC License) — https://lucide.dev */
-const ICONS = {"house":"<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\" /><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\" />","plus":"<path d=\"M5 12h14\" /><path d=\"M12 5v14\" />","clipboard-list":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\" /><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\" /><path d=\"M12 11h4\" /><path d=\"M12 16h4\" /><path d=\"M8 11h.01\" /><path d=\"M8 16h.01\" />","layout-dashboard":"<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\" />","hourglass":"<path d=\"M5 22h14\" /><path d=\"M5 2h14\" /><path d=\"M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22\" /><path d=\"M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2\" />","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\" /><path d=\"M3 3v5h5\" /><path d=\"M12 7v5l4 2\" />","chart-column":"<path d=\"M3 3v16a2 2 0 0 0 2 2h16\" /><path d=\"M18 17V9\" /><path d=\"M13 17V5\" /><path d=\"M8 17v-3\" />","log-out":"<path d=\"m16 17 5-5-5-5\" /><path d=\"M21 12H9\" /><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\" />","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\" /><path d=\"M21 3v5h-5\" /><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\" /><path d=\"M8 16H3v5\" />","search":"<path d=\"m21 21-4.34-4.34\" /><circle cx=\"11\" cy=\"11\" r=\"8\" />","sliders-horizontal":"<path d=\"M10 5H3\" /><path d=\"M12 19H3\" /><path d=\"M14 3v4\" /><path d=\"M16 17v4\" /><path d=\"M21 12h-9\" /><path d=\"M21 19h-5\" /><path d=\"M21 5h-7\" /><path d=\"M8 10v4\" /><path d=\"M8 12H3\" />","download":"<path d=\"M12 15V3\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" /><path d=\"m7 10 5 5 5-5\" />","x":"<path d=\"M18 6 6 18\" /><path d=\"m6 6 12 12\" />","chevron-left":"<path d=\"m15 18-6-6 6-6\" />","chevron-right":"<path d=\"m9 18 6-6-6-6\" />","check":"<path d=\"M20 6 9 17l-5-5\" />","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\" /><circle cx=\"12\" cy=\"12\" r=\"3\" />","eye-off":"<path d=\"M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49\" /><path d=\"M14.084 14.158a3 3 0 0 1-4.242-4.242\" /><path d=\"M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143\" /><path d=\"m2 2 20 20\" />","paperclip":"<path d=\"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551\" />","camera":"<path d=\"M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z\" /><circle cx=\"12\" cy=\"13\" r=\"3\" />","file-text":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"M10 9H8\" /><path d=\"M16 13H8\" /><path d=\"M16 17H8\" />","image":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\" /><circle cx=\"9\" cy=\"9\" r=\"2\" /><path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\" />","triangle-alert":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /><path d=\"M12 9v4\" /><path d=\"M12 17h.01\" />","info":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 16v-4\" /><path d=\"M12 8h.01\" />","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\" /><path d=\"m21.854 2.147-10.94 10.939\" />","user":"<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\" /><circle cx=\"12\" cy=\"7\" r=\"4\" />","lock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\" /><path d=\"M7 11V7a5 5 0 0 1 10 0v4\" />","key-round":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","cloud-off":"<path d=\"M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057\" /><path d=\"M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78\" /><path d=\"m2 2 20 20\" />","upload":"<path d=\"M12 3v12\" /><path d=\"m17 8-5-5-5 5\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" />","bus":"<path d=\"M8 6v6\" /><path d=\"M15 6v6\" /><path d=\"M2 12h19.6\" /><path d=\"M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3\" /><circle cx=\"7\" cy=\"18\" r=\"2\" /><path d=\"M9 18h5\" /><circle cx=\"16\" cy=\"18\" r=\"2\" />","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z\" />","zap":"<path d=\"M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z\" />","circle-dot":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"12\" cy=\"12\" r=\"10\" />","snowflake":"<path d=\"m10 20-1.25-2.5L6 18\" /><path d=\"M10 4 8.75 6.5 6 6\" /><path d=\"m14 20 1.25-2.5L18 18\" /><path d=\"m14 4 1.25 2.5L18 6\" /><path d=\"m17 21-3-6h-4\" /><path d=\"m17 3-3 6 1.5 3\" /><path d=\"M2 12h6.5L10 9\" /><path d=\"m20 10-1.5 2 1.5 2\" /><path d=\"M22 12h-6.5L14 15\" /><path d=\"m4 10 1.5 2L4 14\" /><path d=\"m7 21 3-6-1.5-3\" /><path d=\"m7 3 3 6h4\" />","fuel":"<path d=\"M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0v-6.998a2 2 0 0 0-.59-1.42L18 5\" /><path d=\"M14 21V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v16\" /><path d=\"M2 21h13\" /><path d=\"M3 9h11\" />","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\" /><line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\" /><line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\" />","circle-plus":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M8 12h8\" /><path d=\"M12 8v8\" />","cog":"<path d=\"M11 10.27 7 3.34\" /><path d=\"m11 13.73-4 6.93\" /><path d=\"M12 22v-2\" /><path d=\"M12 2v2\" /><path d=\"M14 12h8\" /><path d=\"m17 20.66-1-1.73\" /><path d=\"m17 3.34-1 1.73\" /><path d=\"M2 12h2\" /><path d=\"m20.66 17-1.73-1\" /><path d=\"m20.66 7-1.73 1\" /><path d=\"m3.34 17 1.73-1\" /><path d=\"m3.34 7 1.73 1\" /><circle cx=\"12\" cy=\"12\" r=\"2\" /><circle cx=\"12\" cy=\"12\" r=\"8\" />","map-pin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\" /><circle cx=\"12\" cy=\"10\" r=\"3\" />","calendar":"<path d=\"M8 2v3\" /><path d=\"M16 2v3\" /><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" /><path d=\"M3 9h18\" />","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 6v6l4 2\" />","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\" /><path d=\"M16 3.128a4 4 0 0 1 0 7.744\" /><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\" /><circle cx=\"9\" cy=\"7\" r=\"4\" />","repeat":"<path d=\"m17 2 4 4-4 4\" /><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\" /><path d=\"m7 22-4-4 4-4\" /><path d=\"M21 13v1a4 4 0 0 1-4 4H3\" />","truck":"<path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\" /><path d=\"M15 18H9\" /><path d=\"M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14\" /><circle cx=\"17\" cy=\"18\" r=\"2\" /><circle cx=\"7\" cy=\"18\" r=\"2\" />","circle-check":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m16 9-5.5 5.5L8 12\" />","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\" /><path d=\"m15 5 4 4\" />","archive":"<rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" /><path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" /><path d=\"M10 12h4\" />","badge-check":"<path d=\"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z\" /><path d=\"m16 9-5.5 5.5L8 12\" />","shield-check":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /><path d=\"m9 12 2 2 4-4\" />","id-card":"<path d=\"M13 19a4 4 0 00-8 0\" /><path d=\"M16 10h2\" /><path d=\"M16 14h2\" /><circle cx=\"9\" cy=\"12\" r=\"3\" /><rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\" />","route":"<circle cx=\"6\" cy=\"19\" r=\"3\" /><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\" /><circle cx=\"18\" cy=\"5\" r=\"3\" />","circle-help":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\" /><path d=\"M12 17h.01\" />","sparkles":"<path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /><path d=\"M20 2v4\" /><path d=\"M22 4h-4\" /><circle cx=\"4\" cy=\"20\" r=\"2\" />","car-front":"<path d=\"m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8\" /><path d=\"M7 14h.01\" /><path d=\"M17 14h.01\" /><rect width=\"18\" height=\"8\" x=\"3\" y=\"10\" rx=\"2\" /><path d=\"M5 18v2\" /><path d=\"M19 18v2\" />","ellipsis":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"19\" cy=\"12\" r=\"1\" /><circle cx=\"5\" cy=\"12\" r=\"1\" />","arrow-right":"<path d=\"M5 12h14\" /><path d=\"m12 5 7 7-7 7\" />","circle-x":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m15 9-6 6\" /><path d=\"m9 9 6 6\" />","file-check":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"m9 15 2 2 4-4\" />","timer":"<line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\" /><line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\" /><circle cx=\"12\" cy=\"14\" r=\"8\" />","party-popper":"<path d=\"M5.8 11.3 2 22l10.7-3.79\" /><path d=\"M4 3h.01\" /><path d=\"M22 8h.01\" /><path d=\"M15 2h.01\" /><path d=\"M22 20h.01\" /><path d=\"m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10\" /><path d=\"m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17\" /><path d=\"m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7\" /><path d=\"M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z\" />","inbox":"<polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\" /><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\" />"};
+const ICONS = {"house":"<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\" /><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\" />","plus":"<path d=\"M5 12h14\" /><path d=\"M12 5v14\" />","clipboard-list":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\" /><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\" /><path d=\"M12 11h4\" /><path d=\"M12 16h4\" /><path d=\"M8 11h.01\" /><path d=\"M8 16h.01\" />","layout-dashboard":"<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\" />","hourglass":"<path d=\"M5 22h14\" /><path d=\"M5 2h14\" /><path d=\"M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22\" /><path d=\"M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2\" />","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\" /><path d=\"M3 3v5h5\" /><path d=\"M12 7v5l4 2\" />","chart-column":"<path d=\"M3 3v16a2 2 0 0 0 2 2h16\" /><path d=\"M18 17V9\" /><path d=\"M13 17V5\" /><path d=\"M8 17v-3\" />","log-out":"<path d=\"m16 17 5-5-5-5\" /><path d=\"M21 12H9\" /><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\" />","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\" /><path d=\"M21 3v5h-5\" /><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\" /><path d=\"M8 16H3v5\" />","search":"<path d=\"m21 21-4.34-4.34\" /><circle cx=\"11\" cy=\"11\" r=\"8\" />","sliders-horizontal":"<path d=\"M10 5H3\" /><path d=\"M12 19H3\" /><path d=\"M14 3v4\" /><path d=\"M16 17v4\" /><path d=\"M21 12h-9\" /><path d=\"M21 19h-5\" /><path d=\"M21 5h-7\" /><path d=\"M8 10v4\" /><path d=\"M8 12H3\" />","download":"<path d=\"M12 15V3\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" /><path d=\"m7 10 5 5 5-5\" />","x":"<path d=\"M18 6 6 18\" /><path d=\"m6 6 12 12\" />","chevron-left":"<path d=\"m15 18-6-6 6-6\" />","chevron-right":"<path d=\"m9 18 6-6-6-6\" />","check":"<path d=\"M20 6 9 17l-5-5\" />","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\" /><circle cx=\"12\" cy=\"12\" r=\"3\" />","eye-off":"<path d=\"M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49\" /><path d=\"M14.084 14.158a3 3 0 0 1-4.242-4.242\" /><path d=\"M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143\" /><path d=\"m2 2 20 20\" />","paperclip":"<path d=\"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551\" />","camera":"<path d=\"M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z\" /><circle cx=\"12\" cy=\"13\" r=\"3\" />","file-text":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"M10 9H8\" /><path d=\"M16 13H8\" /><path d=\"M16 17H8\" />","image":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\" /><circle cx=\"9\" cy=\"9\" r=\"2\" /><path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\" />","triangle-alert":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /><path d=\"M12 9v4\" /><path d=\"M12 17h.01\" />","info":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 16v-4\" /><path d=\"M12 8h.01\" />","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\" /><path d=\"m21.854 2.147-10.94 10.939\" />","user":"<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\" /><circle cx=\"12\" cy=\"7\" r=\"4\" />","lock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\" /><path d=\"M7 11V7a5 5 0 0 1 10 0v4\" />","key-round":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","cloud-off":"<path d=\"M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057\" /><path d=\"M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78\" /><path d=\"m2 2 20 20\" />","upload":"<path d=\"M12 3v12\" /><path d=\"m17 8-5-5-5 5\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" />","bus":"<path d=\"M8 6v6\" /><path d=\"M15 6v6\" /><path d=\"M2 12h19.6\" /><path d=\"M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3\" /><circle cx=\"7\" cy=\"18\" r=\"2\" /><path d=\"M9 18h5\" /><circle cx=\"16\" cy=\"18\" r=\"2\" />","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z\" />","zap":"<path d=\"M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z\" />","circle-dot":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"12\" cy=\"12\" r=\"10\" />","snowflake":"<path d=\"m10 20-1.25-2.5L6 18\" /><path d=\"M10 4 8.75 6.5 6 6\" /><path d=\"m14 20 1.25-2.5L18 18\" /><path d=\"m14 4 1.25 2.5L18 6\" /><path d=\"m17 21-3-6h-4\" /><path d=\"m17 3-3 6 1.5 3\" /><path d=\"M2 12h6.5L10 9\" /><path d=\"m20 10-1.5 2 1.5 2\" /><path d=\"M22 12h-6.5L14 15\" /><path d=\"m4 10 1.5 2L4 14\" /><path d=\"m7 21 3-6-1.5-3\" /><path d=\"m7 3 3 6h4\" />","fuel":"<path d=\"M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0v-6.998a2 2 0 0 0-.59-1.42L18 5\" /><path d=\"M14 21V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v16\" /><path d=\"M2 21h13\" /><path d=\"M3 9h11\" />","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\" /><line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\" /><line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\" />","circle-plus":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M8 12h8\" /><path d=\"M12 8v8\" />","cog":"<path d=\"M11 10.27 7 3.34\" /><path d=\"m11 13.73-4 6.93\" /><path d=\"M12 22v-2\" /><path d=\"M12 2v2\" /><path d=\"M14 12h8\" /><path d=\"m17 20.66-1-1.73\" /><path d=\"m17 3.34-1 1.73\" /><path d=\"M2 12h2\" /><path d=\"m20.66 17-1.73-1\" /><path d=\"m20.66 7-1.73 1\" /><path d=\"m3.34 17 1.73-1\" /><path d=\"m3.34 7 1.73 1\" /><circle cx=\"12\" cy=\"12\" r=\"2\" /><circle cx=\"12\" cy=\"12\" r=\"8\" />","map-pin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\" /><circle cx=\"12\" cy=\"10\" r=\"3\" />","calendar":"<path d=\"M8 2v3\" /><path d=\"M16 2v3\" /><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" /><path d=\"M3 9h18\" />","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 6v6l4 2\" />","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\" /><path d=\"M16 3.128a4 4 0 0 1 0 7.744\" /><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\" /><circle cx=\"9\" cy=\"7\" r=\"4\" />","repeat":"<path d=\"m17 2 4 4-4 4\" /><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\" /><path d=\"m7 22-4-4 4-4\" /><path d=\"M21 13v1a4 4 0 0 1-4 4H3\" />","truck":"<path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\" /><path d=\"M15 18H9\" /><path d=\"M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14\" /><circle cx=\"17\" cy=\"18\" r=\"2\" /><circle cx=\"7\" cy=\"18\" r=\"2\" />","circle-check":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m16 9-5.5 5.5L8 12\" />","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\" /><path d=\"m15 5 4 4\" />","archive":"<rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" /><path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" /><path d=\"M10 12h4\" />","badge-check":"<path d=\"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z\" /><path d=\"m16 9-5.5 5.5L8 12\" />","shield-check":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /><path d=\"m9 12 2 2 4-4\" />","id-card":"<path d=\"M13 19a4 4 0 00-8 0\" /><path d=\"M16 10h2\" /><path d=\"M16 14h2\" /><circle cx=\"9\" cy=\"12\" r=\"3\" /><rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\" />","route":"<circle cx=\"6\" cy=\"19\" r=\"3\" /><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\" /><circle cx=\"18\" cy=\"5\" r=\"3\" />","circle-help":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\" /><path d=\"M12 17h.01\" />","sparkles":"<path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /><path d=\"M20 2v4\" /><path d=\"M22 4h-4\" /><circle cx=\"4\" cy=\"20\" r=\"2\" />","car-front":"<path d=\"m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8\" /><path d=\"M7 14h.01\" /><path d=\"M17 14h.01\" /><rect width=\"18\" height=\"8\" x=\"3\" y=\"10\" rx=\"2\" /><path d=\"M5 18v2\" /><path d=\"M19 18v2\" />","ellipsis":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"19\" cy=\"12\" r=\"1\" /><circle cx=\"5\" cy=\"12\" r=\"1\" />","arrow-right":"<path d=\"M5 12h14\" /><path d=\"m12 5 7 7-7 7\" />","circle-x":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m15 9-6 6\" /><path d=\"m9 9 6 6\" />","file-check":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"m9 15 2 2 4-4\" />","timer":"<line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\" /><line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\" /><circle cx=\"12\" cy=\"14\" r=\"8\" />","party-popper":"<path d=\"M5.8 11.3 2 22l10.7-3.79\" /><path d=\"M4 3h.01\" /><path d=\"M22 8h.01\" /><path d=\"M15 2h.01\" /><path d=\"M22 20h.01\" /><path d=\"m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10\" /><path d=\"m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17\" /><path d=\"m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7\" /><path d=\"M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z\" />","inbox":"<polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\" /><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\" />","trash-2":"<path d=\"M10 11v6\" /><path d=\"M14 11v6\" /><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /><path d=\"M3 6h18\" /><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" />","chevron-down":"<path d=\"m6 9 6 6 6-6\" />","database":"<ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /><path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /><path d=\"M3 12A9 3 0 0 0 21 12\" />","list-plus":"<path d=\"M16 5H3\" /><path d=\"M11 12H3\" /><path d=\"M16 19H3\" /><path d=\"M18 9v6\" /><path d=\"M21 12h-6\" />","undo-2":"<path d=\"M9 14 4 9l5-5\" /><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\" />"};
 function ic(name, size, cls) {
   const s = size || 20;
   return `<svg class="ic${cls ? ' ' + cls : ''}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -89,10 +100,11 @@ const state = {
   route: 'home',              // colaborador: home | wizard | minhas | success
   minhasFiltro: 'todas',
   wiz: null, success: null, sheet: null, modal: null,
-  outbox: [], draftInfo: null, loginError: '', loginBusy: false, passError: '', passBusy: false, busy: false,
+  picker: null, loadingData: false, outbox: [], draftInfo: null, loginError: '', loginBusy: false, passError: '', passBusy: false, busy: false,
   qa: {
     view: 'dashboard', detail: null, showFilters: false, limit: 100,
     f: { q: '', from: '', to: '', status: '', setor: '', linha: '', motivo: '', impacto: '', subst: '' },
+    cad: { tab: 'veiculos', q: '', draft: '' },
     rel: { from: '', to: '' }, drafts: { socorro: '', obs: '', correcao: '' }, draftFor: null
   }
 };
@@ -123,8 +135,9 @@ function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
 function yn(v) { return v === 'sim' ? 'Sim' : v === 'nao' ? 'Não' : '—'; }
 function motivoIcon(v, size) { const m = MOTIVOS.find(x => x.v === v); return ic(m ? m.i : 'circle-help', size || 20); }
 function statusLabel(s, qa) { const m = STATUS[s]; return m ? (qa ? m.qa : m.colab) : s; }
-function pill(s, qa) { const m = STATUS[s] || { tone: 'gray' }; return `<span class="pill tone-${m.tone}"><i></i>${esc(statusLabel(s, qa))}</span>`; }
-function isQA() { return state.user && state.user.perfil === 'qualidade'; }
+function perfil() { return state.user ? state.user.perfil : ''; }
+function pill(s, qa, o) { const m = STATUS[s] || { tone: 'gray' }; return `<span class="pill tone-${m.tone}"><i></i>${esc(qa && o ? stageLabel(o) : statusLabel(s, qa))}</span>`; }
+function isQA() { return !!state.user && EQUIPES.includes(state.user.perfil); }   // equipes internas usam o painel
 function findOcc(p) { return state.occs.find(o => o.protocolo === p); }
 function upsertOcc(o) {
   const i = state.occs.findIndex(x => x.protocolo === o.protocolo);
@@ -228,7 +241,10 @@ function screenErr(s, d) {          // devolve {k, msg} do primeiro problema da 
   if (s.type === 'fields') {
     for (const f of s.fields) {
       if (isOpt(f, d)) continue;
-      if (!String(d[f.k] || '').trim()) return { k: f.k, msg: `Preencha: ${f.label}.` };
+      const v = String(d[f.k] || '').trim(), lista = state.listas[f.list] || [];
+      const daLista = (f.kind === 'combo' || f.kind === 'pills') && lista.length > 0;
+      if (!v) return { k: f.k, msg: daLista ? `Selecione: ${f.label}.` : `Preencha: ${f.label}.` };
+      if (daLista && !(f.mesmo && v === MESMO_MOTORISTA) && !lista.includes(d[f.k])) return { k: f.k, msg: `Escolha ${f.label} na lista cadastrada.` };
     }
     if (s.id === 'quando') {
       if (d.data > todayISO()) return { k: 'data', msg: 'A data não pode ser no futuro.' };
@@ -288,8 +304,11 @@ function wizExit() {
 function setAnswer(k, v, auto) {
   const w = state.wiz; if (!w || w.sending) return;
   w.data[k] = v; w.err = null; pruneHidden(w.data); saveDraft();
-  const tk = ++w.token; render();
-  if (auto) setTimeout(() => { if (state.wiz && state.wiz.token === tk) wizNext(true); }, 260);
+  const tk = ++w.token;
+  // marca a escolha direto na tela, sem redesenhar tudo (evita o "piscar")
+  document.querySelectorAll(`[data-action="answer"][data-k="${k}"], [data-action="pick"][data-k="${k}"]`).forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  const em = document.querySelector('.err-msg'); if (em) em.remove();
+  if (auto) setTimeout(() => { if (state.wiz && state.wiz.token === tk) wizNext(true); }, 240);
 }
 
 /* ------------------------- Seções (revisão e detalhe) ------------------------- */
@@ -407,7 +426,7 @@ function topbar() {
   return `<header class="topbar">${LOGO}
     <button class="avatar-btn" data-action="openPerfil" aria-label="Perfil e sair">${esc(initials(state.user.nome))}</button></header>`;
 }
-const SHORT = { aguardando_lancamento: 'Aguardando', em_analise: 'Em análise', correcao_solicitada: 'Corrigir', validada: 'Validada', encerrada: 'Encerrada' };
+const SHORT = { aguardando_manutencao: 'Aguardando', correcao_solicitada: 'Corrigir', em_tratamento: 'Em andamento', aguardando_qualidade: 'Em andamento', encerrada: 'Finalizada' };
 function pillShort(s) { const m = STATUS[s] || { tone: 'gray' }; return `<span class="pill tone-${m.tone}"><i></i>${esc(SHORT[s] || s)}</span>`; }
 function occItem(o) {
   return `<button class="occ" data-action="openSheet" data-id="${esc(o.protocolo)}">
@@ -424,7 +443,7 @@ function emptyBox(icon, text) { return `<div class="empty"><span>${ic(icon, 32)}
 
 function renderHome() {
   const mine = myOccs();
-  const andamento = mine.filter(o => ['aguardando_lancamento', 'em_analise'].includes(o.status)).length;
+  const andamento = mine.filter(o => EM_ANDAMENTO.includes(o.status)).length;
   const corrigir = mine.filter(o => o.status === 'correcao_solicitada');
   const ok = mine.filter(o => CONCLUIDAS.includes(o.status)).length;
   const ob = pendingOutbox(); const d = state.draftInfo;
@@ -433,7 +452,7 @@ function renderHome() {
       ${d ? `<section class="banner info"><span class="b-ic">${ic('pencil', 20)}</span><div><b>Registro em andamento</b><small>Você parou no meio de uma ocorrência (${esc(d.data.veiculo || 'sem veículo')}).</small></div>
         <div class="banner-actions"><button class="btn btn-ghost btn-sm" data-action="discardDraft">Descartar</button><button class="btn btn-primary btn-sm" data-action="resumeDraft">Continuar</button></div></section>` : ''}
       ${corrigir.length ? `<section class="banner warn"><span class="b-ic">${ic('triangle-alert', 20)}</span><div><b>${corrigir.length === 1 ? '1 ocorrência precisa de correção' : corrigir.length + ' ocorrências precisam de correção'}</b>
-        <small>A Qualidade pediu um ajuste.</small></div><button class="btn btn-primary btn-sm" data-action="openSheet" data-id="${esc(corrigir[0].protocolo)}">Ver</button></section>` : ''}
+        <small>${esc(corrigir[0].correcao_por || 'Uma equipe')} pediu um ajuste.</small></div><button class="btn btn-primary btn-sm" data-action="openSheet" data-id="${esc(corrigir[0].protocolo)}">Ver</button></section>` : ''}
       <div class="home-grid">
         <section class="hero card">${SWOOSH}
           <p class="eyebrow">Olá, ${esc(state.user.nome.split(' ')[0])}</p>
@@ -448,13 +467,13 @@ function renderHome() {
         </section>
       </div>
       <h2 class="sec-title">Últimas ocorrências <button class="link" data-action="goMinhas">Ver todas</button></h2>
-      <div class="list">${ob.map(outboxItem).join('')}${mine.slice(0, 6).map(occItem).join('') || (ob.length ? '' : emptyBox('inbox', 'Você ainda não registrou nenhuma ocorrência.'))}</div>
+      <div class="list">${ob.map(outboxItem).join('')}${mine.slice(0, 6).map(occItem).join('') || (ob.length ? '' : state.loadingData ? '<div class="skel"></div><div class="skel"></div><div class="skel"></div>' : emptyBox('inbox', 'Você ainda não registrou nenhuma ocorrência.'))}</div>
     </main>${tabbar('home')}</div></div>`;
 }
 
 function renderMinhas() {
   const f = state.minhasFiltro; let list = myOccs();
-  if (f === 'andamento') list = list.filter(o => ['aguardando_lancamento', 'em_analise'].includes(o.status));
+  if (f === 'andamento') list = list.filter(o => EM_ANDAMENTO.includes(o.status));
   if (f === 'corrigir') list = list.filter(o => o.status === 'correcao_solicitada');
   if (f === 'concluidas') list = list.filter(o => CONCLUIDAS.includes(o.status));
   const chip = (id, t) => `<button class="chip ${f === id ? 'on' : ''}" data-action="setMinhasFiltro" data-v="${id}">${t}</button>`;
@@ -467,7 +486,7 @@ function renderMinhas() {
 
 /* ---------- Colaborador: assistente de perguntas ---------- */
 function datalists() {
-  return ['veiculos', 'motoristas', 'linhas'].map(k => `<datalist id="dl-${k}">${(state.listas[k] || []).map(v => `<option value="${esc(v)}"></option>`).join('')}</datalist>`).join('');
+  return '';
 }
 function errMsg(k) { const e = state.wiz && state.wiz.err; return e && e.k === k ? `<p class="err-msg" role="alert">${ic('triangle-alert', 15)} ${esc(e.msg)}</p>` : ''; }
 function fieldHtml(f, d) {
@@ -483,10 +502,14 @@ function fieldHtml(f, d) {
   if (f.kind === 'area') return `<div class="field">${lbl}<textarea id="f-${f.k}" class="inp area${bad}" data-bind="${f.k}" placeholder="${esc(f.ph || '')}" rows="4">${esc(v)}</textarea>${em}</div>`;
   if (f.kind === 'date') return `<div class="field">${lbl}<input id="f-${f.k}" class="inp${bad}" type="date" data-bind="${f.k}" value="${esc(v)}" max="${todayISO()}" />${em}</div>`;
   if (f.kind === 'time') return `<div class="field">${lbl}<input id="f-${f.k}" class="inp${bad}" type="time" data-bind="${f.k}" value="${esc(v)}" />${em}</div>`;
-  const list = f.kind === 'combo' ? ` list="dl-${f.list}"` : '';
+  const lista = state.listas[f.list] || [];
   const mesmo = f.mesmo && v === MESMO_MOTORISTA;
   const toggle = f.mesmo ? `<button type="button" class="togglebtn ${mesmo ? 'on' : ''}" data-action="mesmoMotorista">${ic(mesmo ? 'circle-check' : 'users', 18)} Foi o mesmo motorista (sem troca)</button>` : '';
-  return `<div class="field">${lbl}${toggle}<input id="f-${f.k}" class="inp${bad}" data-bind="${f.k}" value="${esc(v)}" placeholder="${esc(f.ph || '')}" autocomplete="off"${list}${mesmo ? ' readonly' : ''} />${em}</div>`;
+  if (f.kind === 'combo' && lista.length) {      // só seleção: nada de digitar o que não existe
+    return `<div class="field">${lbl}${toggle}<button type="button" id="f-${f.k}" class="picker${bad}${v ? ' has' : ''}" data-action="openPicker" data-k="${f.k}" data-list="${f.list}" data-title="${esc(f.label)}" ${mesmo ? 'disabled' : ''}>
+      <span>${v ? esc(v) : 'Selecionar ' + esc(f.label.toLowerCase())}</span>${ic('chevron-down', 20)}</button>${em}</div>`;
+  }
+  return `<div class="field">${lbl}${toggle}<input id="f-${f.k}" class="inp${bad}" data-bind="${f.k}" value="${esc(v)}" placeholder="${esc(f.ph || '')}" autocomplete="off"${mesmo ? ' readonly' : ''} />${lista.length ? '' : `<p class="tiny muted hint">A lista de ${esc(f.label.toLowerCase())} ainda não foi cadastrada pela Qualidade.</p>`}${em}</div>`;
 }
 function wizSteps(vis, idx) {       // estado de cada seção: concluída / atual / a fazer
   return SECOES.map(sec => {
@@ -556,7 +579,7 @@ function renderSuccess() {
     ${s.pending ? `<p class="muted">Sem conexão no momento. Sua ocorrência será enviada automaticamente assim que o sinal voltar. Não feche o aplicativo para apagar nada — ela está guardada.</p>`
       : `<div class="proto"><small>Protocolo</small><b>${esc(s.protocolo)}</b></div>
          <p class="muted">${s.edited ? 'A Qualidade foi avisada da correção.' : 'Sua ocorrência foi registrada e encaminhada para tratamento.'}</p>
-         <div class="center">${pill(s.status || 'aguardando_lancamento', false)}</div>`}
+         <div class="center">${pill(s.status || 'aguardando_manutencao', false)}</div>`}
     <div class="stack">
       ${!s.pending && s.protocolo ? `<button class="btn btn-primary btn-lg btn-block" data-action="openSheetAfter" data-id="${esc(s.protocolo)}">Ver ocorrência</button>` : ''}
       <button class="btn btn-ghost btn-lg btn-block" data-action="goMinhas">Minhas ocorrências</button>
@@ -574,24 +597,39 @@ function timelineHtml(o) {
   const h = o.historico || []; if (!h.length) return '';
   return `<section class="rv"><header><h3>Histórico</h3></header><ol class="timeline">${h.map(e => `<li><i></i><div><b>${esc(e.acao)}</b><small>${fmtDT(e.ts)} · ${esc(e.usuario)}</small></div></li>`).join('')}</ol></section>`;
 }
+function trackSteps(o) {
+  const val = !!o.manutencao_validado_em, mec = !!o.mecanica_socorro, trp = o.transportes_lancado === 'sim', fim = o.status === 'encerrada';
+  const cor = o.status === 'correcao_solicitada';
+  return [
+    { n: 'Registrada', i: 'file-check', st: 'done' },
+    { n: 'Manutenção', i: 'wrench', st: val ? 'done' : cor ? 'warn' : 'cur' },
+    { n: 'Mecânica', i: 'cog', st: mec ? 'done' : val ? 'cur' : 'todo' },
+    { n: 'Transportes', i: 'truck', st: trp ? 'done' : val ? 'cur' : 'todo' },
+    { n: 'Qualidade', i: 'badge-check', st: fim ? 'done' : o.status === 'aguardando_qualidade' ? 'cur' : 'todo' }
+  ].map(x => fim ? Object.assign(x, { st: 'done' }) : x);
+}
+function trackerHtml(o) {
+  return `<ol class="etapas" aria-label="Andamento da ocorrência">${trackSteps(o).map(x => `<li class="${x.st}"><span>${ic(x.st === 'done' ? 'check' : x.st === 'warn' ? 'triangle-alert' : x.i, 18)}</span><b>${x.n}</b></li>`).join('')}</ol>`;
+}
 function sheetHtml() {
   const o = findOcc(state.sheet); if (!o) return '';
-  return `<div class="scrim" data-action="closeOverlay" data-self="1"><aside class="sheet" role="dialog" aria-label="Ocorrência ${esc(o.protocolo)}">
+  return `<div data-ov="sheet:${o.protocolo}" class="scrim" data-action="closeOverlay" data-self="1"><aside class="sheet" role="dialog" aria-label="Ocorrência ${esc(o.protocolo)}">
     <div class="grab"></div>
     <header class="sheet-head"><div><h2>${esc(o.protocolo)}</h2><small class="muted">${fmtDate(o.data)} às ${esc(o.hora)} · veículo ${esc(o.veiculo)}</small></div>
       <button class="icon-btn" data-action="closeOverlay" aria-label="Fechar">${ic('x', 20)}</button></header>
     <div class="sheet-body">
-      <div class="row-between">${pill(o.status, false)}${o.numero_socorro ? `<span class="tiny muted">Nº do socorro <b>${esc(o.numero_socorro)}</b></span>` : ''}</div>
-      ${o.status === 'correcao_solicitada' ? `<div class="alert warn"><b>A Qualidade pediu uma correção</b><p>${esc(o.correcao_mensagem)}</p>
+      <div class="row-between">${pill(o.status, false)}</div>
+      ${trackerHtml(o)}
+      ${o.status === 'correcao_solicitada' ? `<div class="alert warn"><b>${esc(o.correcao_por || 'A equipe')} pediu uma correção</b><p>${esc(o.correcao_mensagem)}</p>
         <button class="btn btn-primary btn-block" data-action="fixOcc" data-id="${esc(o.protocolo)}">Corrigir e reenviar</button></div>` : ''}
       ${sections(o).map(sec => `<section class="rv"><header><h3>${sec.t}</h3></header>${rowsHtml(sec.rows)}</section>`).join('')}
       ${attachmentsHtml(o)}${timelineHtml(o)}
     </div></aside></div>`;
 }
 function perfilHtml() {
-  return `<div class="scrim center-modal" data-action="closeOverlay" data-self="1"><div class="modal">
+  return `<div data-ov="perfil" class="scrim center-modal" data-action="closeOverlay" data-self="1"><div class="modal">
     <div class="avatar-lg">${esc(initials(state.user.nome))}</div><h2>${esc(state.user.nome)}</h2>
-    <p class="muted">Matrícula ${esc(state.user.matricula)} · ${isQA() ? 'Qualidade' : 'Colaborador'}</p>
+    <p class="muted">Matrícula ${esc(state.user.matricula)} · ${ROLE_LABEL[state.user.perfil] || 'Colaborador'}</p>
     <div class="stack"><button class="btn btn-ghost btn-block" data-action="refreshNow">Atualizar dados</button>
     <button class="btn btn-danger btn-block" data-action="logout">Sair</button><button class="btn btn-text btn-block" data-action="closeOverlay">Fechar</button></div></div></div>`;
 }
@@ -607,18 +645,49 @@ function renderOverlays() {
     else if (state.sheet) html += sheetHtml();
     if (state.modal && state.modal.type === 'perfil') html += perfilHtml();
     if (state.modal && state.modal.type === 'confirm') html += confirmHtml();
+    if (state.picker && state.wiz && state.route === 'wizard') html += pickerHtml();
   }
   layer.innerHTML = html;
+  const prev = layer._ov || {}, cur = {};
+  Array.from(layer.children).forEach(el => { const k = el.dataset.ov || ''; cur[k] = 1; if (!prev[k]) el.classList.add('a'); });  // anima só quando abre
+  layer._ov = cur;
+  const ms = layer.querySelector('.msgs'); if (ms) ms.scrollTop = ms.scrollHeight;
   document.body.classList.toggle('no-scroll', !!html);
 }
+function normTxt(x) { return String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+function pickerFiltered() {
+  const p = state.picker, q = normTxt(p.q).trim(), lista = state.listas[p.list] || [];
+  const itens = q ? lista.filter(x => normTxt(x).includes(q)) : lista.slice();
+  if (q) itens.sort((a, b) => (normTxt(a).startsWith(q) ? 0 : 1) - (normTxt(b).startsWith(q) ? 0 : 1));
+  return itens;
+}
+function pickerItems() {
+  const itens = pickerFiltered(), cur = state.wiz ? state.wiz.data[state.picker.k] : '';
+  if (!itens.length) return `<div class="empty small"><span>${ic('search', 28)}</span>Nada encontrado.<br>Se não está na lista, peça para a Qualidade cadastrar.</div>`;
+  return itens.slice(0, 120).map(x => `<button class="pk-item ${x === cur ? 'on' : ''}" data-action="pickOpt" data-v="${esc(x)}"><span>${esc(x)}</span>${x === cur ? ic('check', 20) : ''}</button>`).join('')
+    + (itens.length > 120 ? `<p class="tiny muted pk-more">Mostrando 120 de ${itens.length}. Digite para filtrar.</p>` : '');
+}
+function pickerHtml() {
+  const p = state.picker, total = (state.listas[p.list] || []).length;
+  return `<div data-ov="picker:${esc(p.k)}" class="scrim" data-action="closePicker" data-self="1"><aside class="sheet picker-sheet" role="dialog" aria-label="${esc(p.title)}">
+    <div class="grab"></div>
+    <header class="sheet-head"><div><h2>${esc(p.title)}</h2><small class="muted">${total} cadastrado${total === 1 ? '' : 's'}</small></div>
+      <button class="icon-btn" data-action="closePicker" aria-label="Fechar">${ic('x', 20)}</button></header>
+    <div class="pk-search"><span>${ic('search', 18)}</span><input id="pk-q" autocomplete="off" inputmode="search" placeholder="Digite para buscar…" value="${esc(p.q)}"></div>
+    <div class="pk-list" id="pk-list">${pickerItems()}</div></aside></div>`;
+}
+
 function confirmHtml() {
   const m = state.modal;
-  return `<div class="scrim center-modal" data-action="closeModal" data-self="1"><div class="modal"><h2>${esc(m.title)}</h2><p class="muted">${esc(m.text)}</p>
+  return `<div data-ov="confirm:${m.action}:${m.id || ''}" class="scrim center-modal" data-action="closeModal" data-self="1"><div class="modal"><h2>${esc(m.title)}</h2><p class="muted">${esc(m.text)}</p>
     <div class="stack"><button class="btn ${m.danger ? 'btn-danger' : 'btn-primary'} btn-block" data-action="${esc(m.action)}" data-id="${esc(m.id || '')}">${esc(m.confirm)}</button>
     <button class="btn btn-ghost btn-block" data-action="closeModal">Cancelar</button></div></div></div>`;
 }
+let lastViewKey = '';
+function viewKey() { return [state.boot, state.user ? state.user.matricula : '', isQA() ? state.qa.view : state.route, state.wiz ? state.wiz.current : ''].join('|'); }
 function render() {
   const root = document.getElementById('root'); if (!root) return;
+  const vk = viewKey(); root.classList.toggle('anim', vk !== lastViewKey); lastViewKey = vk;   // sem reanimar a mesma tela
   let html = '';
   if (state.boot === 'setup') html = renderSetup();
   else if (state.boot === 'loading') html = renderLoading();
@@ -635,7 +704,7 @@ function render() {
     const s = visibleFlow(state.wiz.data).find(x => x.id === state.wiz.current);
     if (s && s.type === 'fields' && s.id !== 'quando') {
       const bad = state.wiz.err && document.getElementById('f-' + state.wiz.err.k);
-      const first = bad || s.fields.map(f => document.getElementById('f-' + f.k)).find(el => el && !el.value && !el.readOnly);
+      const first = bad || s.fields.map(f => document.getElementById('f-' + f.k)).find(el => el && el.tagName !== 'BUTTON' && !el.value && !el.readOnly);
       if (first && first.focus) first.focus({ preventScroll: true });
     }
   }
@@ -648,7 +717,7 @@ function applySession(data) {
   const auth = API.Auth.get() || {};
   if (data.token) API.Auth.set({ token: data.token, user: data.user }); else if (auth.token) API.Auth.set({ token: auth.token, user: data.user });
   state.user = data.user; state.listas = data.listas || state.listas; state.occs = data.ocorrencias || [];
-  state.lastSync = Date.now(); saveCache(); refreshDraftInfo();
+  state.lastSync = Date.now(); state.loadingData = false; saveCache(); refreshDraftInfo();
 }
 function isTyping() { const a = document.activeElement; return !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.closest && a.closest('#root, #overlay-layer')); }
 
@@ -656,20 +725,26 @@ async function sync(silent) {
   if (!state.user || state.syncing || state.boot !== 'app') return;
   state.syncing = true; if (!silent) { render(); }
   const before = {}; state.occs.forEach(o => { before[o.protocolo] = o.status; });
+  const filaAntes = new Set(state.occs.filter(o => inQueue(o, perfil())).map(o => o.protocolo)), msgsAntes = {}, primeira = !state.occs.length;
+  state.occs.forEach(o => { msgsAntes[o.protocolo] = (o.mensagens || []).length; });
   const r = await API.call('listar');
   state.syncing = false;
   if (r.ok) {
     const novas = r.data.ocorrencias;
     if (silent) {
       if (isQA()) {
-        const n = novas.filter(o => !(o.protocolo in before)).length;
-        if (before && Object.keys(before).length && n) toast(n === 1 ? 'Chegou 1 nova ocorrência.' : `Chegaram ${n} novas ocorrências.`);
+        const p = perfil(), fila = novas.filter(o => inQueue(o, p) && !filaAntes.has(o.protocolo)).length;
+        if (primeira === false && fila) toast(fila === 1 ? 'Nova ocorrência na sua fila.' : `${fila} novas ocorrências na sua fila.`);
+        novas.forEach(o => { const antes = msgsAntes[o.protocolo]; const ult = (o.mensagens || []).slice(-1)[0];
+          if (antes !== undefined && (o.mensagens || []).length > antes && ult && ult.matricula !== state.user.matricula) toast(`Nova mensagem em ${o.protocolo}`); });
       } else {
         novas.forEach(o => { if (before[o.protocolo] && before[o.protocolo] !== o.status) toast(`${o.protocolo}: ${statusLabel(o.status, false)}`); });
       }
     }
-    state.occs = novas; state.lastSync = Date.now(); saveCache();
-    if (!(silent && (isTyping() || state.route === 'wizard'))) render();
+    const mudou = JSON.stringify(novas) !== JSON.stringify(state.occs);
+    if (r.data.listas) state.listas = r.data.listas;
+    state.occs = novas; state.lastSync = Date.now(); state.loadingData = false; saveCache();
+    if (!silent || mudou) { if (!(silent && (isTyping() || state.route === 'wizard' || state.picker))) render(); }
   } else if (r.code === 'AUTH') { doLogout(r.message || 'Sessão expirada.'); }
   else if (!silent) { toast(r.message || 'Não foi possível atualizar.', 'error'); render(); }
 }
@@ -784,6 +859,9 @@ const ACTIONS = {
     String(ds.for || 'lg-p').split(',').forEach(id => { const i = document.getElementById(id); if (i) { i.type = i.type === 'password' ? 'text' : 'password'; show = i.type === 'text'; } });
     if (btn) btn.innerHTML = ic(show ? 'eye-off' : 'eye', 20);
   },
+  openPicker(ds) { state.picker = { k: ds.k, list: ds.list, title: ds.title, q: '' }; renderOverlays(); setTimeout(() => { const i = document.getElementById('pk-q'); if (i) i.focus({ preventScroll: true }); }, 60); },
+  closePicker() { state.picker = null; renderOverlays(); },
+  pickOpt(ds) { const w = state.wiz; if (!w || !state.picker) return; w.data[state.picker.k] = ds.v; w.err = null; saveDraft(); state.picker = null; render(); },
   mesmoMotorista() { const w = state.wiz; w.data.motorista_substituto = w.data.motorista_substituto === MESMO_MOTORISTA ? '' : MESMO_MOTORISTA; w.err = null; saveDraft(); render(); },
   async login() {
     if (state.loginBusy) return;
@@ -828,7 +906,7 @@ const ACTIONS = {
   resumeDraft() { const d = state.draftInfo; if (!d) return; startWizard({ data: Object.assign(blankData(), d.data), current: d.current }); },
   discardDraft() { clearDraft(); render(); },
   openPerfil() { state.modal = { type: 'perfil' }; renderOverlays(); },
-  closeOverlay() { state.sheet = null; state.modal = null; state.qa.detail = null; renderOverlays(); },
+  closeOverlay() { state.sheet = null; state.modal = null; state.qa.detail = null; state.picker = null; renderOverlays(); },
   closeModal() { state.modal = null; renderOverlays(); },
   refreshNow() { state.modal = null; renderOverlays(); sync(false); },
   openSheet(ds) { state.sheet = ds.id; renderOverlays(); },
@@ -878,6 +956,7 @@ function onClick(e) {
 }
 function onInput(e) {
   const t = e.target;
+  if (t.id === 'pk-q' && state.picker) { state.picker.q = t.value; const l = document.getElementById('pk-list'); if (l) l.innerHTML = pickerItems(); return; }
   if (t.dataset && t.dataset.bind && state.wiz) {
     state.wiz.data[t.dataset.bind] = t.value; saveDraftSoon();
     if (state.wiz.err && state.wiz.err.k === t.dataset.bind) { state.wiz.err = null; t.classList.remove('bad'); const m = t.parentNode.querySelector('.err-msg'); if (m) m.remove(); }
@@ -891,7 +970,9 @@ function onChange(e) {
   if (typeof qaOnChange === 'function') qaOnChange(t);
 }
 function onKey(e) {
+  if (e.key === 'Escape' && state.picker) { ACTIONS.closePicker(); return; }
   if (e.key === 'Escape' && (state.sheet || state.modal || state.qa.detail)) { ACTIONS.closeOverlay(); return; }
+  if (e.key === 'Enter' && e.target.id === 'pk-q' && state.picker) { e.preventDefault(); const it = pickerFiltered(); if (it.length === 1) ACTIONS.pickOpt({ v: it[0] }); return; }
   if (e.key === 'Enter') {
     const t = e.target;
     if (t.id === 'lg-m' || t.id === 'lg-p') { e.preventDefault(); ACTIONS.login(); return; }
@@ -921,12 +1002,13 @@ async function init() {
   loadOutbox();
   const auth = API.Auth.get();
   if (!auth || !auth.token || !auth.user) { state.boot = 'login'; return render(); }
-  state.user = auth.user; loadCache(); refreshDraftInfo(); state.boot = 'app'; render();
+  state.user = auth.user; loadCache(); refreshDraftInfo(); state.loadingData = !state.occs.length; state.boot = 'app'; render();
   const r = await API.call('session');
+  state.loadingData = false;
   if (r.ok) { applySession(r.data); render(); startPolling(); flushOutbox(); }
   else if (r.code === 'FIRST_ACCESS') { state.boot = 'newpass'; state.passError = ''; render(); }
   else if (r.code === 'AUTH') doLogout(r.message);
-  else { toast('Sem conexão: mostrando os últimos dados salvos.'); startPolling(); }
+  else { toast('Sem conexão: mostrando os últimos dados salvos.'); render(); startPolling(); }
 }
 document.addEventListener('DOMContentLoaded', init);
 
@@ -935,11 +1017,22 @@ document.addEventListener('DOMContentLoaded', init);
    (usa funções e estado definidos em script.js)
    ========================================================= */
 
-const QA_NAV = [
-  ['dashboard', 'layout-dashboard', 'Dashboard'], ['ocorrencias', 'clipboard-list', 'Ocorrências'], ['pendencias', 'hourglass', 'Pendências'],
-  ['historico', 'history', 'Histórico'], ['relatorios', 'chart-column', 'Relatórios']
-];
-const QA_TITLES = { dashboard: 'Dashboard', ocorrencias: 'Ocorrências', pendencias: 'Pendências', historico: 'Histórico', relatorios: 'Relatórios' };
+function qaNavItems() {
+  const nav = [['dashboard', 'layout-dashboard', 'Dashboard'], ['ocorrencias', 'clipboard-list', 'Ocorrências'], ['pendencias', 'hourglass', 'Minha fila'],
+    ['historico', 'history', 'Histórico'], ['relatorios', 'chart-column', 'Relatórios']];
+  if (perfil() === 'qualidade') nav.push(['cadastros', 'database', 'Cadastros']);
+  return nav;
+}
+function inQueue(o, p) {
+  if (p === 'manutencao') return o.status === 'aguardando_manutencao';
+  if (p === 'mecanica') return o.status === 'em_tratamento' && !o.mecanica_socorro;
+  if (p === 'transportes') return o.status === 'em_tratamento' && o.transportes_lancado !== 'sim';
+  if (p === 'qualidade') return o.status === 'aguardando_qualidade';
+  return false;
+}
+function oldestFirst(list) { return list.slice().sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em))); }
+function myQueue() { return oldestFirst(state.occs.filter(o => inQueue(o, perfil()))); }
+const QA_TITLES = { dashboard: 'Dashboard', ocorrencias: 'Ocorrências', pendencias: 'Minha fila', historico: 'Histórico', relatorios: 'Relatórios', cadastros: 'Cadastros' };
 
 function qaEmptyFilters() { return { q: '', from: '', to: '', status: '', setor: '', linha: '', motivo: '', impacto: '', subst: '' }; }
 
@@ -977,10 +1070,10 @@ function qaTable(list, opts) {
     <td data-l="Veículo">${esc(o.veiculo)}</td>
     <td data-l="Setor · Linha">${esc(o.setor)}<small>${esc(o.linha)}</small></td>
     <td data-l="Motivo"><span class="mi">${motivoIcon(o.motivo, 16)}</span> ${esc(o.motivo)}</td>
-    <td data-l="Nº Socorro" class="mono${o.numero_socorro ? '' : ' nosoc'}">${o.numero_socorro ? esc(o.numero_socorro) : '<span class="dash">—</span>'}</td>
-    <td data-l="Há"><span class="age ${(o.status === 'aguardando_lancamento' && Date.now() - new Date(o.criado_em) > 3600000) ? 'late' : ''}">${ago(o.criado_em)}</span></td>
-    <td data-l="Status">${pill(o.status, true)}</td></tr>`).join('');
-  return `<div class="table-wrap"><table class="tbl${opts.compact ? ' compact' : ''}"><thead><tr><th>Protocolo</th><th>Quando</th><th>Veículo</th><th>Setor · Linha</th><th>Motivo</th><th>Nº Socorro</th><th>Há</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <td data-l="Nº Fluig" class="mono${o.numero_socorro ? '' : ' nosoc'}">${o.numero_socorro ? esc(o.numero_socorro) : '<span class="dash">—</span>'}</td>
+    <td data-l="Há"><span class="age ${(inQueue(o, perfil()) && Date.now() - new Date(o.criado_em) > 3600000) ? 'late' : ''}">${ago(o.criado_em)}</span></td>
+    <td data-l="Status">${pill(o.status, true, o)}</td></tr>`).join('');
+  return `<div class="table-wrap"><table class="tbl${opts.compact ? ' compact' : ''}"><thead><tr><th>Protocolo</th><th>Quando</th><th>Veículo</th><th>Setor · Linha</th><th>Motivo</th><th>Nº Fluig</th><th>Há</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function bars(items, max) {
   if (!items.length) return '<div class="empty small"><span>—</span>Sem dados no período.</div>';
@@ -999,18 +1092,20 @@ function eventItem(e) {
 
 /* ------------------------- Telas ------------------------- */
 function qaDashboard() {
-  const all = state.occs; const c = s => all.filter(o => o.status === s).length;
+  const all = state.occs, p = perfil(); const c = s => all.filter(o => o.status === s).length;
   const kpi = (label, n, s, cls) => `<button class="kpi ${cls || ''}" data-action="qaKpi" data-s="${s}"><b>${n}</b><span>${label}</span></button>`;
-  const aguard = all.filter(o => o.status === 'aguardando_lancamento').sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em)));
-  const analise = all.filter(o => o.status === 'em_analise').sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em)));
+  const mine = myQueue();
+  const outras = oldestFirst(all.filter(o => o.status !== 'encerrada' && !inQueue(o, p)));
   const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
   const recentes = all.filter(o => o.data >= since);
-  return `<div class="kpis">${kpi('Aguardando nº do socorro', c('aguardando_lancamento'), 'aguardando_lancamento', 'amber')}${kpi('Em análise', c('em_analise'), 'em_analise', 'blue')}
-    ${kpi('Correção solicitada', c('correcao_solicitada'), 'correcao_solicitada', 'orange')}${kpi('Concluídas', c('validada') + c('encerrada'), 'concluidas', 'green')}${kpi('Total', all.length, '', 'total')}</div>
+  return `<div class="kpis">${kpi('Aguardando Manutenção', c('aguardando_manutencao'), 'aguardando_manutencao', 'amber')}${kpi('Correção solicitada', c('correcao_solicitada'), 'correcao_solicitada', 'orange')}
+    ${kpi('Em tratamento', c('em_tratamento'), 'em_tratamento', 'blue')}${kpi('Aguardando Qualidade', c('aguardando_qualidade'), 'aguardando_qualidade', 'teal')}
+    ${kpi('Finalizadas', c('encerrada'), 'encerrada', 'green')}${kpi('Total', all.length, '', 'total')}</div>
     <div class="grid2"><div class="col">
-      <section class="panel"><header><h2>Precisa de atenção <small>aguardando nº do socorro</small></h2></header>${qaTable(aguard.slice(0, 6), { compact: true, empty: 'Tudo em dia: nenhuma ocorrência aguardando lançamento.' })}
-        ${aguard.length > 6 ? `<footer><button class="link" data-action="qaKpi" data-s="aguardando_lancamento">Ver as ${aguard.length} ocorrências</button></footer>` : ''}</section>
-      <section class="panel"><header><h2>A validar <small>socorro já vinculado</small></h2></header>${qaTable(analise.slice(0, 5), { compact: true, empty: 'Nada aguardando validação.' })}</section>
+      <section class="panel"><header><h2>Minha fila <small>${ROLE_LABEL[p]}</small></h2><span class="count">${mine.length}</span></header>
+        ${qaTable(mine.slice(0, 6), { compact: true, empty: 'Nada aguardando a sua equipe. Tudo em dia.' })}
+        ${mine.length > 6 ? `<footer><button class="link" data-action="qaNav" data-v="pendencias">Ver as ${mine.length} ocorrências</button></footer>` : ''}</section>
+      <section class="panel"><header><h2>Em andamento nas outras etapas</h2></header>${qaTable(outras.slice(0, 5), { compact: true, empty: 'Nenhuma outra ocorrência em andamento.' })}</section>
     </div><div class="col">
       <section class="panel"><header><h2>Motivos <small>últimos 30 dias</small></h2></header><div class="pad">${bars(countBy(recentes, o => o.motivo).slice(0, 8))}</div></section>
       <section class="panel"><header><h2>Atividade recente</h2></header><ol class="events">${qaEvents(8).map(eventItem).join('') || '<div class="empty small"><span>—</span>Sem atividade.</div>'}</ol></section>
@@ -1022,7 +1117,7 @@ function qaFiltersPanel() {
   const sel = (key, label, opts) => `<label class="fl"><span>${label}</span><select data-filter="${key}"><option value="">Todos</option>${opts.map(o => { const v = Array.isArray(o) ? o[0] : o, t = Array.isArray(o) ? o[1] : o; return `<option value="${esc(v)}" ${f[key] === v ? 'selected' : ''}>${esc(t)}</option>`; }).join('')}</select></label>`;
   const setores = uniqueSorted([].concat(state.listas.setores || [], state.occs.map(o => o.setor)));
   const linhas = uniqueSorted([].concat(state.listas.linhas || [], state.occs.map(o => o.linha)));
-  const statusOpts = Object.keys(STATUS).map(k => [k, STATUS[k].qa]).concat([['concluidas', 'Concluídas (validadas + encerradas)']]);
+  const statusOpts = Object.keys(STATUS).map(k => [k, STATUS[k].qa]);
   return `<div class="filters"><label class="fl"><span>De</span><input type="date" data-filter="from" value="${esc(f.from)}"></label><label class="fl"><span>Até</span><input type="date" data-filter="to" value="${esc(f.to)}"></label>
     ${sel('status', 'Status', statusOpts)}${sel('setor', 'Setor', setores)}${sel('linha', 'Linha', linhas)}${sel('motivo', 'Motivo', MOTIVOS.map(m => m.v))}
     ${sel('impacto', 'Impacto no horário', [['sim', 'Sim'], ['nao', 'Não']])}${sel('subst', 'Substituição', [['sim', 'Sim'], ['nao', 'Não']])}
@@ -1041,11 +1136,11 @@ function qaOcorrencias() {
     ${state.qa.showFilters ? qaFiltersPanel() : ''}<div id="qa-results">${qaResults()}</div></section>`;
 }
 function qaPendencias() {
-  const g = s => state.occs.filter(o => o.status === s).sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em)));
+  const mine = myQueue(), cor = oldestFirst(state.occs.filter(o => o.status === 'correcao_solicitada'));
   const block = (t, sub, list, empty) => `<section class="panel"><header><h2>${t} <small>${sub}</small></h2><span class="count">${list.length}</span></header>${qaTable(list, { empty })}</section>`;
-  return block('Aguardando nº do socorro', 'lance no sistema corporativo e vincule o número', g('aguardando_lancamento'), 'Nenhuma ocorrência aguardando lançamento.') +
-    block('Em análise', 'socorro vinculado — falta validar', g('em_analise'), 'Nada aguardando validação.') +
-    block('Correção solicitada', 'aguardando o colaborador', g('correcao_solicitada'), 'Nenhuma correção pendente.');
+  const guia = { manutencao: 'valide ou devolva ao colaborador', mecanica: 'analise se é socorro e informe o nº Fluig', transportes: 'faça o lançamento e confirme', qualidade: 'confira e finalize com o nº Fluig' }[perfil()];
+  return block('Minha fila', guia, mine, 'Nada aguardando a sua equipe. Tudo em dia.') +
+    block('Correção solicitada', 'aguardando o colaborador', cor, 'Nenhuma correção pendente.');
 }
 function qaHistorico() {
   const ev = qaEvents(150); if (!ev.length) return `<div class="empty"><span>${ic('history', 32)}</span>Ainda não há atividade registrada.</div>`;
@@ -1060,10 +1155,11 @@ function relRange() {
 }
 function qaStats(list) {
   const n = list.length, pc = fn => n ? Math.round(list.filter(fn).length / n * 100) + '%' : '—';
-  const tempos = list.filter(o => o.data_lancamento_socorro && o.criado_em).map(o => (new Date(o.data_lancamento_socorro) - new Date(o.criado_em)) / 36e5).filter(x => x >= 0);
+  const tempos = list.filter(o => o.status === 'encerrada' && o.data_lancamento_socorro && o.criado_em).map(o => (new Date(o.data_lancamento_socorro) - new Date(o.criado_em)) / 36e5).filter(x => x >= 0);
   const media = tempos.length ? (tempos.reduce((a, b) => a + b, 0) / tempos.length) : null;
   return { n, pass: pc(o => o.possui_passageiros === 'sim'), bald: pc(o => o.houve_baldeio === 'sim'), imp: pc(o => o.houve_impacto_horario === 'sim'),
     subst: pc(o => o.houve_substituicao === 'sim'), rem: pc(o => o.houve_remocao === 'sim'),
+    socorro: (() => { const r = list.filter(o => o.mecanica_socorro); return r.length ? Math.round(r.filter(o => o.mecanica_socorro === 'sim').length / r.length * 100) + '%' : '—'; })(),
     media: media === null ? '—' : media < 1 ? Math.round(media * 60) + ' min' : media.toFixed(1).replace('.', ',') + ' h' };
 }
 function qaRelatorios() {
@@ -1072,78 +1168,165 @@ function qaRelatorios() {
   return `<section class="panel"><div class="toolbar"><label class="fl inline"><span>De</span><input type="date" data-rel="from" value="${esc(r.from)}"></label>
     <label class="fl inline"><span>Até</span><input type="date" data-rel="to" value="${esc(r.to)}"></label><span class="grow"></span>
     <button class="btn btn-primary" data-action="qaExportRel">${ic('download', 16)} Exportar período (.csv)</button></div>
-    <div class="stats">${stat('Ocorrências', s.n)}${stat('Com passageiros', s.pass)}${stat('Com baldeio', s.bald)}${stat('Impacto no horário', s.imp)}${stat('Com substituição', s.subst)}${stat('Com remoção', s.rem)}${stat('Tempo até lançar o socorro', s.media)}</div></section>
+    <div class="stats">${stat('Ocorrências', s.n)}${stat('Com passageiros', s.pass)}${stat('Com baldeio', s.bald)}${stat('Impacto no horário', s.imp)}${stat('Com substituição', s.subst)}${stat('Com remoção', s.rem)}${stat('Confirmados como socorro', s.socorro)}${stat('Tempo até finalizar', s.media)}</div></section>
     <div class="grid2"><div class="col"><section class="panel"><header><h2>Por motivo</h2></header><div class="pad">${bars(countBy(list, o => o.motivo))}</div></section>
       <section class="panel"><header><h2>Por setor</h2></header><div class="pad">${bars(countBy(list, o => o.setor))}</div></section></div>
     <div class="col"><section class="panel"><header><h2>Linhas com mais ocorrências</h2></header><div class="pad">${bars(countBy(list, o => o.linha).slice(0, 8))}</div></section>
       <section class="panel"><header><h2>Veículos reincidentes <small>mais ocorrências</small></h2></header><div class="pad">${bars(countBy(list, o => o.veiculo).slice(0, 8))}</div></section></div></div>`;
 }
 
+const CAD_TABS = [['veiculos', 'Veículos', 'bus', 'veículo'], ['motoristas', 'Motoristas', 'user', 'motorista'], ['linhas', 'Linhas', 'route', 'linha'], ['setores', 'Setores', 'id-card', 'setor']];
+function cadItems() {
+  const c = state.qa.cad, q = normTxt(c.q).trim();
+  const lista = (state.listas[c.tab] || []).filter(x => !q || normTxt(x).includes(q));
+  if (!lista.length) return `<div class="empty small"><span>${ic('inbox', 28)}</span>${q ? 'Nada encontrado.' : 'Nenhum item cadastrado ainda.'}</div>`;
+  return lista.slice(0, 400).map(x => `<div class="cad-item"><span>${esc(x)}</span><button class="icon-btn sm" data-action="cadDel" data-v="${esc(x)}" aria-label="Remover ${esc(x)}">${ic('trash-2', 16)}</button></div>`).join('')
+    + (lista.length > 400 ? `<p class="tiny muted pk-more">Mostrando 400 de ${lista.length}. Use a busca.</p>` : '');
+}
+function qaCadastros() {
+  const c = state.qa.cad, tab = CAD_TABS.find(t => t[0] === c.tab), total = (state.listas[c.tab] || []).length;
+  return `<section class="panel">
+    <div class="seg-tabs">${CAD_TABS.map(t => `<button class="${c.tab === t[0] ? 'on' : ''}" data-action="cadTab" data-v="${t[0]}">${ic(t[2], 18)}<span>${t[1]}</span><b>${(state.listas[t[0]] || []).length}</b></button>`).join('')}</div>
+    <div class="cad-add">
+      <label class="lbl" for="cad-new">Adicionar ${tab[3]}</label>
+      <textarea id="cad-new" class="inp area" data-cad="draft" rows="3" placeholder="Um por linha. Você pode colar uma lista inteira de uma vez.">${esc(c.draft)}</textarea>
+      <button class="btn btn-primary" data-action="cadAdd" ${state.busy ? 'disabled' : ''}>${state.busy ? '<span class="spinner sm"></span>' : ic('plus', 18)} Adicionar à lista</button>
+      <p class="tiny muted">Só o que está cadastrado aparece para seleção no aplicativo. Itens repetidos são ignorados.</p>
+    </div>
+    <div class="toolbar"><div class="search"><span>${ic('search', 16)}</span><input id="cad-q" data-cad="q" value="${esc(c.q)}" placeholder="Buscar em ${tab[1].toLowerCase()}…" autocomplete="off"></div><span class="count">${total}</span></div>
+    <div id="cad-list" class="cad-list">${cadItems()}</div></section>`;
+}
+
 function renderQualidade() {
-  const v = state.qa.view; const pend = state.occs.filter(o => o.status === 'aguardando_lancamento').length;
+  const v = state.qa.view; const pend = myQueue().length;
   const navBtn = (n, cls) => `<button class="${cls} ${v === n[0] ? 'on' : ''}" data-action="qaNav" data-v="${n[0]}"><span class="ti">${ic(n[1], 20)}</span><em>${n[2]}</em>${n[0] === 'pendencias' && pend ? `<i class="nb">${pend}</i>` : ''}</button>`;
-  const content = v === 'dashboard' ? qaDashboard() : v === 'ocorrencias' ? qaOcorrencias() : v === 'pendencias' ? qaPendencias() : v === 'historico' ? qaHistorico() : qaRelatorios();
+  const content = state.loadingData ? '<div class="skel big"></div><div class="skel big"></div><div class="skel"></div>' : v === 'dashboard' ? qaDashboard() : v === 'ocorrencias' ? qaOcorrencias() : v === 'pendencias' ? qaPendencias() : v === 'historico' ? qaHistorico() : v === 'cadastros' ? qaCadastros() : qaRelatorios();
   const sync = state.lastSync ? `Atualizado há ${ago(new Date(state.lastSync).toISOString())}` : '';
   return `<div class="qa"><aside class="qa-side"><div class="qa-brand">${LOGO}</div>
-      <nav>${QA_NAV.map(n => navBtn(n, 'nav')).join('')}</nav>
-      <div class="qa-user"><span class="avatar-sm">${esc(initials(state.user.nome))}</span><div><b>${esc(state.user.nome)}</b><small>Qualidade</small></div>
+      <nav>${qaNavItems().map(n => navBtn(n, 'nav')).join('')}</nav>
+      <div class="qa-user"><span class="avatar-sm">${esc(initials(state.user.nome))}</span><div><b>${esc(state.user.nome)}</b><small>${ROLE_LABEL[state.user.perfil]}</small></div>
       <button class="icon-btn" data-action="logout" title="Sair" aria-label="Sair">${ic('log-out', 16)}</button></div></aside>
     <div class="qa-main"><header class="qa-top"><div class="qa-top-l"><span class="qa-mlogo">${LOGO}</span><h1>${QA_TITLES[v]}</h1></div>
       <div class="qa-top-r"><small class="muted sync">${sync}</small><button class="btn btn-ghost btn-sm ${state.syncing ? 'spin' : ''}" data-action="refreshNow">${ic('refresh-cw', 16)} Atualizar</button>
       <button class="avatar-btn mobile-only" data-action="openPerfil" aria-label="Perfil">${esc(initials(state.user.nome))}</button></div></header>
       <main class="qa-content">${content}</main></div>
-    <nav class="qa-bottom">${QA_NAV.map(n => navBtn(n, 'bn')).join('')}</nav></div>`;
+    <nav class="qa-bottom">${qaNavItems().map(n => navBtn(n, 'bn')).join('')}</nav></div>`;
 }
 
-/* ------------------------- Drawer da ocorrência ------------------------- */
+/* ------------------------- Detalhe da ocorrência (equipes) ------------------------- */
 function qaOverlayHtml() {
   let html = '';
   const o = state.qa.detail ? findOcc(state.qa.detail) : null;
   if (o) html += qaDrawer(o);
   if (state.modal && state.modal.type === 'correcao') html += correcaoModal();
+  if (state.modal && state.modal.type === 'devolver') html += devolverModal();
   return html;
 }
+function kvLine(l, v) { return v ? `<div class="kv"><span>${esc(l)}</span><b>${esc(v)}</b></div>` : ''; }
+function respostasHtml(o) {
+  const man = o.manutencao_validado_em ? kvLine('Manutenção', `Validada por ${o.manutencao_validado_por} · ${fmtDT(o.manutencao_validado_em)}`) : kvLine('Manutenção', 'Aguardando validação');
+  const mec = o.mecanica_socorro
+    ? kvLine('Mecânica', o.mecanica_socorro === 'sim' ? `É socorro · Fluig ${o.numero_socorro} · ${o.mecanica_por}` : `Não é socorro · ${o.mecanica_por}`) + kvLine('Parecer da Mecânica', o.mecanica_parecer)
+    : kvLine('Mecânica', 'Aguardando análise');
+  const trp = o.transportes_lancado === 'sim' ? kvLine('Transportes', `Lançado por ${o.transportes_por} · ${fmtDT(o.transportes_em)}`) + kvLine('Obs. do Transportes', o.transportes_obs) : kvLine('Transportes', 'Aguardando lançamento');
+  const qa = o.status === 'encerrada' ? kvLine('Qualidade', `Finalizada por ${o.responsavel_qualidade} · ${fmtDT(o.data_lancamento_socorro)}`) + kvLine('Observação da Qualidade', o.observacao_qualidade) : '';
+  return `<section class="rv"><header><h3>Respostas das equipes</h3></header>${man}${mec}${trp}${qa}</section>`;
+}
+function conversaHtml(o) {
+  const ms = o.mensagens || [], busy = state.busy;
+  return `<section class="rv chat"><header><h3>Conversa entre as equipes</h3><small class="tiny muted">o colaborador não vê</small></header>
+    <div class="msgs">${ms.length ? ms.map(m => `<div class="msg ${m.matricula === state.user.matricula ? 'me' : ''}"><b>${esc(m.usuario)} <em>${esc(ROLE_LABEL[m.equipe] || m.equipe)}</em></b><p>${esc(m.texto)}</p><small>${fmtDT(m.ts)}</small></div>`).join('')
+      : '<p class="muted tiny pad">Nenhuma mensagem ainda. Use este espaço para tirar dúvidas com as outras equipes.</p>'}</div>
+    <div class="composer"><textarea data-qa="msg" rows="2" maxlength="1000" placeholder="Escreva para as outras equipes…">${esc(state.qa.drafts.msg)}</textarea>
+      <button class="btn btn-primary" data-action="qaMsg" ${busy ? 'disabled' : ''}>${ic('send', 18)} Enviar</button></div></section>`;
+}
+function actBox(titulo, texto, corpo) { return `<section class="act"><h3>${titulo}</h3>${texto ? `<p>${texto}</p>` : ''}${corpo}</section>`; }
+function actionBox(o) {
+  const p = perfil(), d = state.qa.drafts, busy = state.busy, ativa = ['em_tratamento', 'aguardando_qualidade'].includes(o.status);
+  const spin = busy ? '<span class="spinner sm"></span>' : '';
+  if (o.status === 'encerrada') return actBox('Ocorrência finalizada', o.mecanica_socorro === 'sim' ? `Finalizada com o nº Fluig <b>${esc(o.numero_socorro)}</b>.` : 'Finalizada: a Mecânica concluiu que não é socorro.', '');
+  if (o.status === 'correcao_solicitada') return actBox('Aguardando o colaborador', `${esc(o.correcao_por || 'Uma equipe')} pediu a correção: <b>${esc(o.correcao_mensagem)}</b>`, '');
+  if (p === 'manutencao') {
+    if (o.status === 'aguardando_manutencao') return actBox('Sua etapa: validar a ocorrência', 'Confira os dados abaixo. Se estiver correto, valide para liberar a Mecânica e o Transportes. Se algo estiver errado, devolva ao colaborador.',
+      `<div class="actions two"><button class="btn btn-white" data-action="qaManutValidar" ${busy ? 'disabled' : ''}>${spin}${ic('check', 18)} Validar</button><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção</button></div>`);
+    if (o.status === 'em_tratamento') return actBox('Validada pela Manutenção', 'A Mecânica e o Transportes estão atuando. Se perceber algum erro nos dados, ainda dá para pedir correção.', `<div class="actions"><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção</button></div>`);
+    return actBox('Validada pela Manutenção', 'Aguardando a finalização da Qualidade.', '');
+  }
+  if (p === 'mecanica') {
+    if (!ativa) return actBox('Sua etapa: analisar se é socorro', 'Disponível depois que a Manutenção validar a ocorrência.', '');
+    const sim = d.mec_socorro === 'sim', nao = d.mec_socorro === 'nao';
+    return actBox('Sua etapa: analisar se é socorro', 'Analise se esta ocorrência é mesmo um socorro. Se for, informe o nº do lançamento no Fluig. A resposta vai para a Qualidade.',
+      `<div class="duo"><button class="${sim ? 'on' : ''}" data-action="qaMecSocorro" data-v="sim">${ic('circle-check', 20)} É socorro</button><button class="${nao ? 'on' : ''}" data-action="qaMecSocorro" data-v="nao">${ic('circle-x', 20)} Não é socorro</button></div>
+      ${sim ? `<label class="lbl-w" for="mec-fluig">Nº do Fluig do lançamento</label><input id="mec-fluig" class="inp-w" data-qa="mec_fluig" value="${esc(d.mec_fluig)}" placeholder="Ex.: 458721" autocomplete="off">` : ''}
+      ${sim || nao ? `<label class="lbl-w" for="mec-parecer">Parecer ${nao ? '' : '<em>(opcional)</em>'}</label><textarea id="mec-parecer" class="inp-w area" data-qa="mec_parecer" rows="3" placeholder="${nao ? 'Explique por que não é socorro (obrigatório).' : 'Observações para a Qualidade.'}">${esc(d.mec_parecer)}</textarea>` : ''}
+      <button class="btn btn-white btn-block" data-action="qaMecEnviar" ${busy || (!sim && !nao) ? 'disabled' : ''}>${spin}${ic('send', 18)} ${o.mecanica_socorro ? 'Atualizar resposta' : 'Enviar resposta à Qualidade'}</button>`);
+  }
+  if (p === 'transportes') {
+    if (!ativa) return actBox('Sua etapa: lançar o ocorrido', 'Disponível depois que a Manutenção validar a ocorrência.', '');
+    if (o.transportes_lancado === 'sim') return actBox('Lançamento confirmado', `Registrado por ${esc(o.transportes_por)} em ${fmtDT(o.transportes_em)}.`, '');
+    return actBox('Sua etapa: lançar o ocorrido', 'Faça o lançamento do ocorrido e confirme aqui. Acontece sempre, em paralelo com a análise da Mecânica.',
+      `<label class="lbl-w" for="trp-obs">Observação <em>(opcional)</em></label><textarea id="trp-obs" class="inp-w area" data-qa="trp_obs" rows="2" placeholder="Ex.: Lançado no controle de frota.">${esc(d.trp_obs)}</textarea>
+      <button class="btn btn-white btn-block" data-action="qaTrpLancar" ${busy ? 'disabled' : ''}>${spin}${ic('circle-check', 18)} Confirmar lançamento</button>`);
+  }
+  if (p === 'qualidade') {
+    const pronto = o.status === 'aguardando_qualidade', sim = o.mecanica_socorro === 'sim';
+    const falta = []; if (!o.manutencao_validado_em) falta.push('Manutenção'); if (!o.mecanica_socorro) falta.push('Mecânica'); if (o.transportes_lancado !== 'sim') falta.push('Transportes');
+    const sec = `<div class="actions two"><button class="btn btn-ghost-w" data-action="qaDevolverOpen" ${busy ? 'disabled' : ''}>${ic('undo-2', 18)} Devolver para uma equipe</button><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção ao colaborador</button></div>`;
+    if (!pronto) return actBox('Sua etapa: finalizar', `Ainda falta: <b>${esc(falta.join(', '))}</b>. Quando todas responderem, você finaliza aqui.`, sec);
+    return actBox('Sua etapa: finalizar a ocorrência', sim ? 'A Mecânica confirmou o socorro. Confira o nº do Fluig e finalize.' : 'A Mecânica concluiu que não é socorro. Basta finalizar.',
+      `${sim ? `<label class="lbl-w" for="fin-num">Nº do Fluig</label><input id="fin-num" class="inp-w" data-qa="fin_num" value="${esc(d.fin_num == null ? (o.numero_socorro || '') : d.fin_num)}" placeholder="Ex.: 458721" autocomplete="off">` : ''}
+      <label class="lbl-w" for="fin-obs">Observação da Qualidade <em>(opcional)</em></label><textarea id="fin-obs" class="inp-w area" data-qa="fin_obs" rows="2" placeholder="Ex.: Conferido no Fluig.">${esc(d.fin_obs)}</textarea>
+      <button class="btn btn-white btn-block" data-action="qaFinalizar" ${busy ? 'disabled' : ''}>${spin}${ic('badge-check', 18)} Finalizar ocorrência</button>${sec}`);
+  }
+  return '';
+}
 function qaDrawer(o) {
-  const d = state.qa.drafts, busy = state.busy, enc = o.status === 'encerrada';
-  const canValidate = !!o.numero_socorro && o.status === 'em_analise';
-  const hint = enc ? 'Ocorrência encerrada: somente consulta.' : o.status === 'correcao_solicitada' ? 'Aguardando o colaborador corrigir.' : !o.numero_socorro ? 'Vincule o nº do socorro para poder validar.' : '';
-  return `<div class="scrim right" data-action="closeOverlay" data-self="1"><aside class="drawer" role="dialog" aria-label="Ocorrência ${esc(o.protocolo)}">
+  return `<div data-ov="drawer:${o.protocolo}" class="scrim right" data-action="closeOverlay" data-self="1"><aside class="drawer" role="dialog" aria-label="Ocorrência ${esc(o.protocolo)}">
     <header class="drawer-head"><div><h2>${esc(o.protocolo)}</h2><small class="muted">${fmtDate(o.data)} às ${esc(o.hora)} · registrada por ${esc(o.criado_por)} (${esc(o.matricula_criador)})</small></div>
       <button class="icon-btn" data-action="closeOverlay" aria-label="Fechar">${ic('x', 20)}</button></header>
     <div class="drawer-body">
-      <div class="row-between">${pill(o.status, true)}<small class="muted">Registrada há ${ago(o.criado_em)}</small></div>
-      ${o.status === 'correcao_solicitada' ? `<div class="alert warn"><b>Aguardando correção do colaborador</b><p>${esc(o.correcao_mensagem)}</p></div>` : ''}
-      <section class="socorro"><h3>Controle do socorro</h3>
-        <label class="lbl-w" for="qa-soc">Nº do socorro no sistema corporativo</label>
-        <input id="qa-soc" class="inp-w" data-qa="socorro" value="${esc(d.socorro)}" placeholder="Ex.: 458721" inputmode="numeric" ${enc ? 'disabled' : ''} autocomplete="off">
-        <label class="lbl-w" for="qa-obs">Observação da Qualidade <em>(opcional)</em></label>
-        <textarea id="qa-obs" class="inp-w area" data-qa="obs" rows="3" placeholder="Ex.: Socorro lançado no sistema corporativo." ${enc ? 'disabled' : ''}>${esc(d.obs)}</textarea>
-        <button class="btn btn-white btn-block" data-action="qaVincular" ${busy || enc ? 'disabled' : ''}>${busy ? '<span class="spinner sm dark"></span>' : ''}${o.numero_socorro ? 'Salvar alterações' : 'Vincular socorro'}</button>
-        ${o.numero_socorro ? `<p class="linked">${ic('circle-check', 16)} Socorro nº <b>${esc(o.numero_socorro)}</b> vinculado${o.responsavel_qualidade ? ` por <b>${esc(o.responsavel_qualidade)}</b>` : ''} em ${fmtDT(o.data_lancamento_socorro)}</p>` : ''}</section>
-      <div class="actions"><button class="btn btn-primary" data-action="qaValidar" ${busy || !canValidate ? 'disabled' : ''}>${ic('check', 18)} Validar</button>
-        <button class="btn btn-ghost" data-action="qaCorrecaoOpen" ${busy || enc ? 'disabled' : ''}>${ic('pencil', 18)} Solicitar correção</button>
-        <button class="btn btn-ghost" data-action="qaEncerrarAsk" data-id="${esc(o.protocolo)}" ${busy || enc ? 'disabled' : ''}>${ic('archive', 18)} Encerrar</button></div>
-      ${hint ? `<p class="tiny muted">${hint}</p>` : ''}
+      <div class="row-between">${pill(o.status, true, o)}<small class="muted">Registrada há ${ago(o.criado_em)}</small></div>
+      ${trackerHtml(o)}
+      ${actionBox(o)}
+      ${respostasHtml(o)}
+      ${conversaHtml(o)}
       ${sections(o).map(sec => `<section class="rv"><header><h3>${sec.t}</h3></header>${rowsHtml(sec.rows)}</section>`).join('')}
       ${attachmentsHtml(o)}${timelineHtml(o)}
     </div></aside></div>`;
 }
 function correcaoModal() {
   const o = findOcc(state.modal.id); const busy = state.busy;
-  return `<div class="scrim center-modal" data-action="closeModal" data-self="1"><div class="modal"><h2>Solicitar correção</h2>
-    <p class="muted">${esc(o ? o.protocolo : '')} · o colaborador verá este texto no aplicativo.</p>
+  return `<div data-ov="correcao:${state.modal.id}" class="scrim center-modal" data-action="closeModal" data-self="1"><div class="modal"><h2>Pedir correção ao colaborador</h2>
+    <p class="muted">${esc(o ? o.protocolo : '')} · o colaborador verá este texto no aplicativo e a ocorrência volta para a validação da Manutenção.</p>
     <label class="lbl" for="qa-cor">O que precisa ser corrigido?</label>
     <textarea id="qa-cor" class="inp area" data-qa="correcao" rows="4" placeholder="Ex.: Favor corrigir o local da ocorrência.">${esc(state.qa.drafts.correcao)}</textarea>
     <div class="stack"><button class="btn btn-primary btn-block" data-action="qaCorrecaoSend" ${busy ? 'disabled' : ''}>Enviar pedido de correção</button>
       <button class="btn btn-ghost btn-block" data-action="closeModal">Cancelar</button></div></div></div>`;
 }
+function devolverModal() {
+  const o = findOcc(state.modal.id), d = state.qa.drafts, busy = state.busy;
+  const opt = (v, t, ico) => `<button class="choice ${d.dev_alvo === v ? 'on' : ''}" data-action="qaDevAlvo" data-v="${v}"><i></i>${ic(ico, 18)} ${t}</button>`;
+  return `<div data-ov="devolver:${state.modal.id}" class="scrim center-modal" data-action="closeModal" data-self="1"><div class="modal"><h2>Devolver para uma equipe</h2>
+    <p class="muted">${esc(o ? o.protocolo : '')} · a etapa dessa equipe volta a ficar pendente e a mensagem aparece na conversa.</p>
+    <div class="choices tight">${opt('manutencao', 'Manutenção (revalidar)', 'wrench')}${opt('mecanica', 'Mecânica (refazer análise)', 'cog')}${opt('transportes', 'Transportes (refazer lançamento)', 'truck')}</div>
+    <label class="lbl" for="qa-dev">Motivo da devolução</label>
+    <textarea id="qa-dev" class="inp area" data-qa="dev_msg" rows="3" placeholder="Explique o que precisa ser refeito.">${esc(d.dev_msg)}</textarea>
+    <div class="stack"><button class="btn btn-primary btn-block" data-action="qaDevolverSend" ${busy ? 'disabled' : ''}>Devolver</button>
+      <button class="btn btn-ghost btn-block" data-action="closeModal">Cancelar</button></div></div></div>`;
+}
 
 /* ------------------------- Interação ------------------------- */
-function qaResetDrafts(o) { state.qa.draftFor = o.protocolo; state.qa.drafts = { socorro: o.numero_socorro || '', obs: o.observacao_qualidade || '', correcao: '' }; }
+function qaResetDrafts(o) {
+  state.qa.draftFor = o.protocolo;
+  state.qa.drafts = { msg: '', correcao: '', dev_alvo: 'mecanica', dev_msg: '', trp_obs: '',
+    mec_socorro: o.mecanica_socorro || '', mec_fluig: o.mecanica_socorro === 'sim' ? (o.numero_socorro || '') : '', mec_parecer: o.mecanica_parecer || '',
+    fin_num: null, fin_obs: o.observacao_qualidade || '' };   // fin_num null = ainda não mexeu: usa o nº Fluig da Mecânica
+}
 function qaRefreshResults() {
   const el = document.getElementById('qa-results'); if (el) el.innerHTML = qaResults();
 }
 function qaOnInput(t) {
+  if (t.dataset.cad) { state.qa.cad[t.dataset.cad] = t.value; if (t.dataset.cad === 'q') { const l = document.getElementById('cad-list'); if (l) l.innerHTML = cadItems(); } return; }
   if (t.dataset.qa) { state.qa.drafts[t.dataset.qa] = t.value; return; }
   if (t.dataset.filter && t.type !== 'date') { state.qa.f[t.dataset.filter] = t.value; state.qa.limit = 100; qaRefreshResults(); }
 }
@@ -1152,11 +1335,11 @@ function qaOnChange(t) {
   if (t.dataset.filter) { state.qa.f[t.dataset.filter] = t.value; state.qa.limit = 100; qaRefreshResults(); const b = document.querySelector('[data-action="qaToggleFilters"]'); if (b) b.innerHTML = ic('sliders-horizontal', 16) + ' Filtros' + (qaActiveFilterCount() ? ` <span class="badge">${qaActiveFilterCount()}</span>` : ''); return; }
   if (t.dataset.rel) { state.qa.rel[t.dataset.rel] = t.value; render(); }
 }
-async function qaCall(action, payload, okMsg) {
+async function qaCall(action, payload, okMsg, keep) {
   if (state.busy) return; state.busy = true; renderOverlays();
   const r = await API.call(action, payload); state.busy = false;
   if (r.ok) {
-    upsertOcc(r.data.ocorrencia); qaResetDrafts(r.data.ocorrencia); state.modal = null;
+    upsertOcc(r.data.ocorrencia); if (!keep) qaResetDrafts(r.data.ocorrencia); state.modal = null;
     if (okMsg) toast(okMsg); render();
   } else if (r.code === 'AUTH') { doLogout(r.message); }
   else { toast(r.message || 'Não foi possível concluir a ação.', 'error'); renderOverlays(); }
@@ -1177,8 +1360,9 @@ function exportCsv(list, nome) {
     ['detalhamento_substituicao', 'Detalhe do local'], ['veiculo_substituto', 'Veículo substituto'], ['motorista_substituto', 'Motorista substituto'],
     ['manutencao_acionada', 'Manutenção acionada', yn], ['manutencao_deslocou', 'Manutenção deslocou', yn], ['retorno_proprio', 'Retorno próprio', yn],
     ['houve_remocao', 'Remoção', yn], ['tipo_remocao', 'Tipo de remoção'], ['motivo', 'Motivo'], ['descricao_motivo', 'Descrição do motivo'], ['observacoes', 'Observações'],
-    ['numero_socorro', 'Nº Socorro'], ['status', 'Status', s => statusLabel(s, true)], ['responsavel_qualidade', 'Responsável pelo lançamento'],
-    ['data_lancamento_socorro', 'Data do lançamento', fmtDT], ['observacao_qualidade', 'Observação da Qualidade'], ['criado_por', 'Criado por'], ['criado_em', 'Criado em', fmtDT]];
+    ['numero_socorro', 'Nº Fluig'], ['status', 'Status', s => statusLabel(s, true)], ['manutencao_validado_por', 'Manutenção: validado por'], ['mecanica_socorro', 'Mecânica: é socorro?', yn], ['mecanica_parecer', 'Mecânica: parecer'],
+    ['transportes_lancado', 'Transportes: lançado?', yn], ['transportes_por', 'Transportes: lançado por'], ['responsavel_qualidade', 'Finalizado por (Qualidade)'],
+    ['data_lancamento_socorro', 'Finalizado em', fmtDT], ['observacao_qualidade', 'Observação da Qualidade'], ['criado_por', 'Criado por'], ['criado_em', 'Criado em', fmtDT]];
   const head = cols.map(c => csvCell(c[1])).join(';');
   const body = list.map(o => cols.map(c => csvCell(c[2] ? (c[2] === yn && !o[c[0]] ? '' : c[2](o[c[0]])) : o[c[0]])).join(';'));
   const csv = '\uFEFF' + [head].concat(body).join('\r\n');
@@ -1193,6 +1377,33 @@ function exportCsv(list, nome) {
 
 /* ------------------------- Ações ------------------------- */
 Object.assign(ACTIONS, {
+  cadTab(ds) { state.qa.cad.tab = ds.v; state.qa.cad.q = ''; state.qa.cad.draft = ''; render(); },
+  async cadAdd() {
+    const c = state.qa.cad;
+    const itens = String(c.draft || '').split(/[\n;]+/).map(x => x.trim()).filter(Boolean);
+    if (!itens.length) return toast('Digite ou cole pelo menos um item.', 'error');
+    if (state.busy) return; state.busy = true; render();
+    const r = await API.call('listaAdd', { lista: c.tab, itens });
+    state.busy = false;
+    if (r.ok) {
+      state.listas = r.data.listas; saveCache(); c.draft = '';
+      toast(`${r.data.adicionados} adicionado(s)` + (r.data.ignorados ? ` · ${r.data.ignorados} já existia(m)` : ''));
+    } else if (r.code === 'AUTH') { return doLogout(r.message); }
+    else toast(r.message || 'Não foi possível adicionar.', 'error');
+    render();
+  },
+  cadDel(ds) {
+    state.modal = { type: 'confirm', title: `Remover "${ds.v}"?`, text: 'Ninguém mais poderá escolher este item nas próximas ocorrências. As ocorrências já registradas não são alteradas.', confirm: 'Remover', action: 'cadDelDo', id: ds.v, danger: true };
+    renderOverlays();
+  },
+  async cadDelDo(ds) {
+    state.modal = null; renderOverlays();
+    const r = await API.call('listaDel', { lista: state.qa.cad.tab, item: ds.id });
+    if (r.ok) { state.listas = r.data.listas; saveCache(); toast('Item removido.'); }
+    else if (r.code === 'AUTH') return doLogout(r.message);
+    else toast(r.message || 'Não foi possível remover.', 'error');
+    render();
+  },
   qaNav(ds) { state.qa.view = ds.v; state.qa.detail = null; render(); window.scrollTo && window.scrollTo(0, 0); },
   qaKpi(ds) { state.qa.f = qaEmptyFilters(); state.qa.f.status = ds.s; state.qa.view = 'ocorrencias'; state.qa.showFilters = !!ds.s; state.qa.limit = 100; render(); },
   qaToggleFilters() { state.qa.showFilters = !state.qa.showFilters; render(); },
@@ -1200,31 +1411,39 @@ Object.assign(ACTIONS, {
   qaMore() { state.qa.limit += 100; qaRefreshResults(); },
   qaExport() { exportCsv(sortRecent(qaFilter(state.occs, state.qa.f)), 'univale-ocorrencias'); },
   qaExportRel() { const r = relRange(); exportCsv(sortRecent(state.occs.filter(o => o.data >= r.from && o.data <= r.to)), 'univale-relatorio'); },
-  async qaOpen(ds) {
-    const o = findOcc(ds.id); if (!o) return;
-    state.qa.detail = o.protocolo; state.modal = null; qaResetDrafts(o); renderOverlays();
-    if (!(o.historico || []).some(h => h.acao === 'Recebida pelo controlador.')) {
-      const r = await API.call('receber', { protocolo: o.protocolo });
-      if (r.ok) { const keep = Object.assign({}, state.qa.drafts); upsertOcc(r.data.ocorrencia); if (state.qa.detail === o.protocolo) { state.qa.drafts = keep; if (!isTyping()) renderOverlays(); } }
-      else if (r.code === 'AUTH') doLogout(r.message);
-    }
-  },
-  qaVincular() {
-    const o = findOcc(state.qa.detail); if (!o) return;
-    const n = (state.qa.drafts.socorro || '').trim();
-    if (!n) return toast('Informe o número do socorro.', 'error');
-    qaCall('vincular', { protocolo: o.protocolo, numero_socorro: n, observacao_qualidade: state.qa.drafts.obs || '' }, o.numero_socorro ? 'Alterações salvas.' : `Socorro nº ${n} vinculado.`);
-  },
-  qaValidar() { const o = findOcc(state.qa.detail); if (o) qaCall('validar', { protocolo: o.protocolo }, 'Ocorrência validada.'); },
+  qaOpen(ds) { const o = findOcc(ds.id); if (!o) return; state.qa.detail = o.protocolo; state.modal = null; qaResetDrafts(o); renderOverlays(); },
+  qaManutValidar() { const o = findOcc(state.qa.detail); if (o) qaCall('manutencaoValidar', { protocolo: o.protocolo }, 'Validada. Mecânica e Transportes foram liberados.'); },
   qaCorrecaoOpen() { state.qa.drafts.correcao = ''; state.modal = { type: 'correcao', id: state.qa.detail }; renderOverlays(); },
   qaCorrecaoSend() {
     const m = (state.qa.drafts.correcao || '').trim();
     if (!m) return toast('Descreva o que precisa ser corrigido.', 'error');
     qaCall('correcao', { protocolo: state.modal.id, mensagem: m }, 'Pedido de correção enviado ao colaborador.');
   },
-  qaEncerrarAsk(ds) {
-    state.modal = { type: 'confirm', title: 'Encerrar esta ocorrência?', text: 'Depois de encerrada ela fica somente para consulta e não poderá mais ser alterada.', confirm: 'Encerrar ocorrência', action: 'qaEncerrar', id: ds.id, danger: true };
-    renderOverlays();
+  qaMecSocorro(ds) { state.qa.drafts.mec_socorro = ds.v; renderOverlays(); },
+  qaMecEnviar() {
+    const o = findOcc(state.qa.detail), d = state.qa.drafts; if (!o) return;
+    if (!d.mec_socorro) return toast('Escolha: é socorro ou não é socorro.', 'error');
+    if (d.mec_socorro === 'sim' && !(d.mec_fluig || '').trim()) return toast('Informe o nº do Fluig.', 'error');
+    if (d.mec_socorro === 'nao' && (d.mec_parecer || '').trim().length < 5) return toast('Explique por que não é socorro.', 'error');
+    qaCall('mecanicaResponder', { protocolo: o.protocolo, socorro: d.mec_socorro, fluig: d.mec_socorro === 'sim' ? d.mec_fluig : '', parecer: d.mec_parecer || '' }, 'Resposta enviada à Qualidade.');
   },
-  qaEncerrar(ds) { qaCall('encerrar', { protocolo: ds.id }, 'Ocorrência encerrada.'); }
+  qaTrpLancar() { const o = findOcc(state.qa.detail); if (o) qaCall('transportesLancar', { protocolo: o.protocolo, obs: state.qa.drafts.trp_obs || '' }, 'Lançamento confirmado.'); },
+  qaFinalizar() {
+    const o = findOcc(state.qa.detail), d = state.qa.drafts; if (!o) return;
+    const num = String(d.fin_num == null ? (o.numero_socorro || '') : d.fin_num).trim();
+    if (o.mecanica_socorro === 'sim' && !num) return toast('Informe o nº do Fluig para finalizar.', 'error');
+    qaCall('finalizar', { protocolo: o.protocolo, numero: num, observacao: d.fin_obs || '' }, 'Ocorrência finalizada.');
+  },
+  qaDevolverOpen() { state.qa.drafts.dev_msg = ''; state.modal = { type: 'devolver', id: state.qa.detail }; renderOverlays(); },
+  qaDevAlvo(ds) { state.qa.drafts.dev_alvo = ds.v; renderOverlays(); },
+  qaDevolverSend() {
+    const d = state.qa.drafts; if (!(d.dev_msg || '').trim()) return toast('Explique o motivo da devolução.', 'error');
+    qaCall('devolver', { protocolo: state.modal.id, alvo: d.dev_alvo, mensagem: d.dev_msg }, 'Devolvida para ' + ROLE_LABEL[d.dev_alvo] + '.');
+  },
+  async qaMsg() {
+    const o = findOcc(state.qa.detail), t = (state.qa.drafts.msg || '').trim(); if (!o) return;
+    if (!t) return toast('Escreva a mensagem.', 'error');
+    await qaCall('mensagem', { protocolo: o.protocolo, texto: t }, '', true);
+    if (findOcc(o.protocolo)) { state.qa.drafts.msg = ''; renderOverlays(); }
+  }
 });

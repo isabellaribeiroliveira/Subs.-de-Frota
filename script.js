@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 const CFG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbxzFv4Ve3sNujTGNCk5Q_hj9OSz3gy_jY_VyCZ4UhTon_YTJ8Ayc49wrJAtjB2DxSIS/exec',
+  API_URL: '',
   REFRESH_MS: 45000,     // atualização automática dos dados (ms)
   MAX_ANEXO_MB: 6,       // tamanho máximo de cada anexo
   MAX_ANEXOS: 5          // anexos por ocorrência
@@ -65,27 +65,21 @@ const TIPOS_IMPACTO = ['Atraso', 'Horário não cumprido', 'Viagem interrompida'
 const TIPOS_REMOCAO = ['Reboque', 'Guincho', 'Outro'];
 
 const STATUS = {
-  aguardando_manutencao: { qa: 'Aguardando Manutenção', colab: 'Aguardando análise', tone: 'amber' },
-  correcao_solicitada:   { qa: 'Correção solicitada',   colab: 'Correção solicitada', tone: 'orange' },
-  em_tratamento:         { qa: 'Em tratamento',         colab: 'Em andamento',        tone: 'blue' },
-  aguardando_qualidade:  { qa: 'Aguardando Qualidade',  colab: 'Em andamento',        tone: 'teal' },
-  encerrada:             { qa: 'Finalizada',            colab: 'Finalizada',          tone: 'green' }
+  aguardando_manutencao: { qa: 'Aguardando Manutenção',               colab: 'Aguardando análise',  tone: 'amber' },
+  correcao_solicitada:   { qa: 'Correção solicitada',                 colab: 'Correção solicitada', tone: 'orange' },
+  aguardando_lancamento: { qa: 'Aguardando lançamento',                colab: 'Em andamento',        tone: 'blue' },
+  aguardando_qualidade:  { qa: 'Aguardando Qualidade',                colab: 'Em andamento',        tone: 'teal' },
+  encerrada:             { qa: 'Finalizada',                          colab: 'Finalizada',          tone: 'green' }
 };
 const CONCLUIDAS = ['encerrada'];
-const EM_ANDAMENTO = ['aguardando_manutencao', 'em_tratamento', 'aguardando_qualidade'];
-const EQUIPES = ['manutencao', 'mecanica', 'transportes', 'qualidade'];
-const ROLE_LABEL = { colaborador: 'Colaborador', manutencao: 'Manutenção', mecanica: 'Mecânica', transportes: 'Transportes', qualidade: 'Qualidade' };
-// texto do status para as equipes: em tratamento mostra quem ainda falta
-function stageLabel(o) {
-  if (o.status === 'em_tratamento') {
-    const f = []; if (!o.mecanica_socorro) f.push('Mecânica'); if (o.transportes_lancado !== 'sim') f.push('Transportes');
-    return 'Aguardando ' + f.join(' e ');
-  }
-  return (STATUS[o.status] || {}).qa || o.status;
-}
+const EM_ANDAMENTO = ['aguardando_manutencao', 'aguardando_lancamento', 'aguardando_qualidade'];
+const EQUIPES = ['transportes', 'manutencao', 'qualidade'];   // quem participa da conversa
+const PAINEL = ['manutencao', 'qualidade'];                    // quem usa o painel; o Transportes usa o app de cadastro
+const ROLE_LABEL = { transportes: 'Transportes', manutencao: 'Manutenção', qualidade: 'Qualidade' };
+function stageLabel(o) { return (STATUS[o.status] || {}).qa || o.status; }
 
 /* Ícones Lucide (ISC License) — https://lucide.dev */
-const ICONS = {"house":"<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\" /><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\" />","plus":"<path d=\"M5 12h14\" /><path d=\"M12 5v14\" />","clipboard-list":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\" /><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\" /><path d=\"M12 11h4\" /><path d=\"M12 16h4\" /><path d=\"M8 11h.01\" /><path d=\"M8 16h.01\" />","layout-dashboard":"<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\" />","hourglass":"<path d=\"M5 22h14\" /><path d=\"M5 2h14\" /><path d=\"M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22\" /><path d=\"M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2\" />","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\" /><path d=\"M3 3v5h5\" /><path d=\"M12 7v5l4 2\" />","chart-column":"<path d=\"M3 3v16a2 2 0 0 0 2 2h16\" /><path d=\"M18 17V9\" /><path d=\"M13 17V5\" /><path d=\"M8 17v-3\" />","log-out":"<path d=\"m16 17 5-5-5-5\" /><path d=\"M21 12H9\" /><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\" />","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\" /><path d=\"M21 3v5h-5\" /><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\" /><path d=\"M8 16H3v5\" />","search":"<path d=\"m21 21-4.34-4.34\" /><circle cx=\"11\" cy=\"11\" r=\"8\" />","sliders-horizontal":"<path d=\"M10 5H3\" /><path d=\"M12 19H3\" /><path d=\"M14 3v4\" /><path d=\"M16 17v4\" /><path d=\"M21 12h-9\" /><path d=\"M21 19h-5\" /><path d=\"M21 5h-7\" /><path d=\"M8 10v4\" /><path d=\"M8 12H3\" />","download":"<path d=\"M12 15V3\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" /><path d=\"m7 10 5 5 5-5\" />","x":"<path d=\"M18 6 6 18\" /><path d=\"m6 6 12 12\" />","chevron-left":"<path d=\"m15 18-6-6 6-6\" />","chevron-right":"<path d=\"m9 18 6-6-6-6\" />","check":"<path d=\"M20 6 9 17l-5-5\" />","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\" /><circle cx=\"12\" cy=\"12\" r=\"3\" />","eye-off":"<path d=\"M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49\" /><path d=\"M14.084 14.158a3 3 0 0 1-4.242-4.242\" /><path d=\"M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143\" /><path d=\"m2 2 20 20\" />","paperclip":"<path d=\"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551\" />","camera":"<path d=\"M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z\" /><circle cx=\"12\" cy=\"13\" r=\"3\" />","file-text":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"M10 9H8\" /><path d=\"M16 13H8\" /><path d=\"M16 17H8\" />","image":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\" /><circle cx=\"9\" cy=\"9\" r=\"2\" /><path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\" />","triangle-alert":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /><path d=\"M12 9v4\" /><path d=\"M12 17h.01\" />","info":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 16v-4\" /><path d=\"M12 8h.01\" />","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\" /><path d=\"m21.854 2.147-10.94 10.939\" />","user":"<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\" /><circle cx=\"12\" cy=\"7\" r=\"4\" />","lock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\" /><path d=\"M7 11V7a5 5 0 0 1 10 0v4\" />","key-round":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","cloud-off":"<path d=\"M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057\" /><path d=\"M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78\" /><path d=\"m2 2 20 20\" />","upload":"<path d=\"M12 3v12\" /><path d=\"m17 8-5-5-5 5\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" />","bus":"<path d=\"M8 6v6\" /><path d=\"M15 6v6\" /><path d=\"M2 12h19.6\" /><path d=\"M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3\" /><circle cx=\"7\" cy=\"18\" r=\"2\" /><path d=\"M9 18h5\" /><circle cx=\"16\" cy=\"18\" r=\"2\" />","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z\" />","zap":"<path d=\"M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z\" />","circle-dot":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"12\" cy=\"12\" r=\"10\" />","snowflake":"<path d=\"m10 20-1.25-2.5L6 18\" /><path d=\"M10 4 8.75 6.5 6 6\" /><path d=\"m14 20 1.25-2.5L18 18\" /><path d=\"m14 4 1.25 2.5L18 6\" /><path d=\"m17 21-3-6h-4\" /><path d=\"m17 3-3 6 1.5 3\" /><path d=\"M2 12h6.5L10 9\" /><path d=\"m20 10-1.5 2 1.5 2\" /><path d=\"M22 12h-6.5L14 15\" /><path d=\"m4 10 1.5 2L4 14\" /><path d=\"m7 21 3-6-1.5-3\" /><path d=\"m7 3 3 6h4\" />","fuel":"<path d=\"M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0v-6.998a2 2 0 0 0-.59-1.42L18 5\" /><path d=\"M14 21V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v16\" /><path d=\"M2 21h13\" /><path d=\"M3 9h11\" />","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\" /><line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\" /><line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\" />","circle-plus":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M8 12h8\" /><path d=\"M12 8v8\" />","cog":"<path d=\"M11 10.27 7 3.34\" /><path d=\"m11 13.73-4 6.93\" /><path d=\"M12 22v-2\" /><path d=\"M12 2v2\" /><path d=\"M14 12h8\" /><path d=\"m17 20.66-1-1.73\" /><path d=\"m17 3.34-1 1.73\" /><path d=\"M2 12h2\" /><path d=\"m20.66 17-1.73-1\" /><path d=\"m20.66 7-1.73 1\" /><path d=\"m3.34 17 1.73-1\" /><path d=\"m3.34 7 1.73 1\" /><circle cx=\"12\" cy=\"12\" r=\"2\" /><circle cx=\"12\" cy=\"12\" r=\"8\" />","map-pin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\" /><circle cx=\"12\" cy=\"10\" r=\"3\" />","calendar":"<path d=\"M8 2v3\" /><path d=\"M16 2v3\" /><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" /><path d=\"M3 9h18\" />","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 6v6l4 2\" />","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\" /><path d=\"M16 3.128a4 4 0 0 1 0 7.744\" /><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\" /><circle cx=\"9\" cy=\"7\" r=\"4\" />","repeat":"<path d=\"m17 2 4 4-4 4\" /><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\" /><path d=\"m7 22-4-4 4-4\" /><path d=\"M21 13v1a4 4 0 0 1-4 4H3\" />","truck":"<path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\" /><path d=\"M15 18H9\" /><path d=\"M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14\" /><circle cx=\"17\" cy=\"18\" r=\"2\" /><circle cx=\"7\" cy=\"18\" r=\"2\" />","circle-check":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m16 9-5.5 5.5L8 12\" />","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\" /><path d=\"m15 5 4 4\" />","archive":"<rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" /><path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" /><path d=\"M10 12h4\" />","badge-check":"<path d=\"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z\" /><path d=\"m16 9-5.5 5.5L8 12\" />","shield-check":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /><path d=\"m9 12 2 2 4-4\" />","id-card":"<path d=\"M13 19a4 4 0 00-8 0\" /><path d=\"M16 10h2\" /><path d=\"M16 14h2\" /><circle cx=\"9\" cy=\"12\" r=\"3\" /><rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\" />","route":"<circle cx=\"6\" cy=\"19\" r=\"3\" /><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\" /><circle cx=\"18\" cy=\"5\" r=\"3\" />","circle-help":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\" /><path d=\"M12 17h.01\" />","sparkles":"<path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /><path d=\"M20 2v4\" /><path d=\"M22 4h-4\" /><circle cx=\"4\" cy=\"20\" r=\"2\" />","car-front":"<path d=\"m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8\" /><path d=\"M7 14h.01\" /><path d=\"M17 14h.01\" /><rect width=\"18\" height=\"8\" x=\"3\" y=\"10\" rx=\"2\" /><path d=\"M5 18v2\" /><path d=\"M19 18v2\" />","ellipsis":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"19\" cy=\"12\" r=\"1\" /><circle cx=\"5\" cy=\"12\" r=\"1\" />","arrow-right":"<path d=\"M5 12h14\" /><path d=\"m12 5 7 7-7 7\" />","circle-x":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m15 9-6 6\" /><path d=\"m9 9 6 6\" />","file-check":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"m9 15 2 2 4-4\" />","timer":"<line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\" /><line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\" /><circle cx=\"12\" cy=\"14\" r=\"8\" />","party-popper":"<path d=\"M5.8 11.3 2 22l10.7-3.79\" /><path d=\"M4 3h.01\" /><path d=\"M22 8h.01\" /><path d=\"M15 2h.01\" /><path d=\"M22 20h.01\" /><path d=\"m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10\" /><path d=\"m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17\" /><path d=\"m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7\" /><path d=\"M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z\" />","inbox":"<polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\" /><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\" />","trash-2":"<path d=\"M10 11v6\" /><path d=\"M14 11v6\" /><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /><path d=\"M3 6h18\" /><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" />","chevron-down":"<path d=\"m6 9 6 6 6-6\" />","database":"<ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /><path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /><path d=\"M3 12A9 3 0 0 0 21 12\" />","list-plus":"<path d=\"M16 5H3\" /><path d=\"M11 12H3\" /><path d=\"M16 19H3\" /><path d=\"M18 9v6\" /><path d=\"M21 12h-6\" />","undo-2":"<path d=\"M9 14 4 9l5-5\" /><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\" />"};
+const ICONS = {"house":"<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\" /><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\" />","plus":"<path d=\"M5 12h14\" /><path d=\"M12 5v14\" />","clipboard-list":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\" /><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\" /><path d=\"M12 11h4\" /><path d=\"M12 16h4\" /><path d=\"M8 11h.01\" /><path d=\"M8 16h.01\" />","layout-dashboard":"<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\" />","hourglass":"<path d=\"M5 22h14\" /><path d=\"M5 2h14\" /><path d=\"M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22\" /><path d=\"M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2\" />","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\" /><path d=\"M3 3v5h5\" /><path d=\"M12 7v5l4 2\" />","chart-column":"<path d=\"M3 3v16a2 2 0 0 0 2 2h16\" /><path d=\"M18 17V9\" /><path d=\"M13 17V5\" /><path d=\"M8 17v-3\" />","log-out":"<path d=\"m16 17 5-5-5-5\" /><path d=\"M21 12H9\" /><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\" />","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\" /><path d=\"M21 3v5h-5\" /><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\" /><path d=\"M8 16H3v5\" />","search":"<path d=\"m21 21-4.34-4.34\" /><circle cx=\"11\" cy=\"11\" r=\"8\" />","sliders-horizontal":"<path d=\"M10 5H3\" /><path d=\"M12 19H3\" /><path d=\"M14 3v4\" /><path d=\"M16 17v4\" /><path d=\"M21 12h-9\" /><path d=\"M21 19h-5\" /><path d=\"M21 5h-7\" /><path d=\"M8 10v4\" /><path d=\"M8 12H3\" />","download":"<path d=\"M12 15V3\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" /><path d=\"m7 10 5 5 5-5\" />","x":"<path d=\"M18 6 6 18\" /><path d=\"m6 6 12 12\" />","chevron-left":"<path d=\"m15 18-6-6 6-6\" />","chevron-right":"<path d=\"m9 18 6-6-6-6\" />","check":"<path d=\"M20 6 9 17l-5-5\" />","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\" /><circle cx=\"12\" cy=\"12\" r=\"3\" />","eye-off":"<path d=\"M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49\" /><path d=\"M14.084 14.158a3 3 0 0 1-4.242-4.242\" /><path d=\"M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143\" /><path d=\"m2 2 20 20\" />","paperclip":"<path d=\"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551\" />","camera":"<path d=\"M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z\" /><circle cx=\"12\" cy=\"13\" r=\"3\" />","file-text":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"M10 9H8\" /><path d=\"M16 13H8\" /><path d=\"M16 17H8\" />","image":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\" /><circle cx=\"9\" cy=\"9\" r=\"2\" /><path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\" />","triangle-alert":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /><path d=\"M12 9v4\" /><path d=\"M12 17h.01\" />","info":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 16v-4\" /><path d=\"M12 8h.01\" />","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\" /><path d=\"m21.854 2.147-10.94 10.939\" />","user":"<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\" /><circle cx=\"12\" cy=\"7\" r=\"4\" />","lock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\" /><path d=\"M7 11V7a5 5 0 0 1 10 0v4\" />","key-round":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","cloud-off":"<path d=\"M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057\" /><path d=\"M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78\" /><path d=\"m2 2 20 20\" />","upload":"<path d=\"M12 3v12\" /><path d=\"m17 8-5-5-5 5\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" />","bus":"<path d=\"M8 6v6\" /><path d=\"M15 6v6\" /><path d=\"M2 12h19.6\" /><path d=\"M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3\" /><circle cx=\"7\" cy=\"18\" r=\"2\" /><path d=\"M9 18h5\" /><circle cx=\"16\" cy=\"18\" r=\"2\" />","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z\" />","zap":"<path d=\"M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z\" />","circle-dot":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"12\" cy=\"12\" r=\"10\" />","snowflake":"<path d=\"m10 20-1.25-2.5L6 18\" /><path d=\"M10 4 8.75 6.5 6 6\" /><path d=\"m14 20 1.25-2.5L18 18\" /><path d=\"m14 4 1.25 2.5L18 6\" /><path d=\"m17 21-3-6h-4\" /><path d=\"m17 3-3 6 1.5 3\" /><path d=\"M2 12h6.5L10 9\" /><path d=\"m20 10-1.5 2 1.5 2\" /><path d=\"M22 12h-6.5L14 15\" /><path d=\"m4 10 1.5 2L4 14\" /><path d=\"m7 21 3-6-1.5-3\" /><path d=\"m7 3 3 6h4\" />","fuel":"<path d=\"M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0v-6.998a2 2 0 0 0-.59-1.42L18 5\" /><path d=\"M14 21V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v16\" /><path d=\"M2 21h13\" /><path d=\"M3 9h11\" />","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\" /><line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\" /><line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\" />","circle-plus":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M8 12h8\" /><path d=\"M12 8v8\" />","cog":"<path d=\"M11 10.27 7 3.34\" /><path d=\"m11 13.73-4 6.93\" /><path d=\"M12 22v-2\" /><path d=\"M12 2v2\" /><path d=\"M14 12h8\" /><path d=\"m17 20.66-1-1.73\" /><path d=\"m17 3.34-1 1.73\" /><path d=\"M2 12h2\" /><path d=\"m20.66 17-1.73-1\" /><path d=\"m20.66 7-1.73 1\" /><path d=\"m3.34 17 1.73-1\" /><path d=\"m3.34 7 1.73 1\" /><circle cx=\"12\" cy=\"12\" r=\"2\" /><circle cx=\"12\" cy=\"12\" r=\"8\" />","map-pin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\" /><circle cx=\"12\" cy=\"10\" r=\"3\" />","calendar":"<path d=\"M8 2v3\" /><path d=\"M16 2v3\" /><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" /><path d=\"M3 9h18\" />","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 6v6l4 2\" />","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\" /><path d=\"M16 3.128a4 4 0 0 1 0 7.744\" /><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\" /><circle cx=\"9\" cy=\"7\" r=\"4\" />","repeat":"<path d=\"m17 2 4 4-4 4\" /><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\" /><path d=\"m7 22-4-4 4-4\" /><path d=\"M21 13v1a4 4 0 0 1-4 4H3\" />","truck":"<path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\" /><path d=\"M15 18H9\" /><path d=\"M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14\" /><circle cx=\"17\" cy=\"18\" r=\"2\" /><circle cx=\"7\" cy=\"18\" r=\"2\" />","circle-check":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m16 9-5.5 5.5L8 12\" />","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\" /><path d=\"m15 5 4 4\" />","archive":"<rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" /><path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" /><path d=\"M10 12h4\" />","badge-check":"<path d=\"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z\" /><path d=\"m16 9-5.5 5.5L8 12\" />","shield-check":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /><path d=\"m9 12 2 2 4-4\" />","id-card":"<path d=\"M13 19a4 4 0 00-8 0\" /><path d=\"M16 10h2\" /><path d=\"M16 14h2\" /><circle cx=\"9\" cy=\"12\" r=\"3\" /><rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\" />","route":"<circle cx=\"6\" cy=\"19\" r=\"3\" /><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\" /><circle cx=\"18\" cy=\"5\" r=\"3\" />","circle-help":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\" /><path d=\"M12 17h.01\" />","sparkles":"<path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /><path d=\"M20 2v4\" /><path d=\"M22 4h-4\" /><circle cx=\"4\" cy=\"20\" r=\"2\" />","car-front":"<path d=\"m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8\" /><path d=\"M7 14h.01\" /><path d=\"M17 14h.01\" /><rect width=\"18\" height=\"8\" x=\"3\" y=\"10\" rx=\"2\" /><path d=\"M5 18v2\" /><path d=\"M19 18v2\" />","ellipsis":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"19\" cy=\"12\" r=\"1\" /><circle cx=\"5\" cy=\"12\" r=\"1\" />","arrow-right":"<path d=\"M5 12h14\" /><path d=\"m12 5 7 7-7 7\" />","circle-x":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m15 9-6 6\" /><path d=\"m9 9 6 6\" />","file-check":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"m9 15 2 2 4-4\" />","timer":"<line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\" /><line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\" /><circle cx=\"12\" cy=\"14\" r=\"8\" />","party-popper":"<path d=\"M5.8 11.3 2 22l10.7-3.79\" /><path d=\"M4 3h.01\" /><path d=\"M22 8h.01\" /><path d=\"M15 2h.01\" /><path d=\"M22 20h.01\" /><path d=\"m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10\" /><path d=\"m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17\" /><path d=\"m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7\" /><path d=\"M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z\" />","inbox":"<polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\" /><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\" />","trash-2":"<path d=\"M10 11v6\" /><path d=\"M14 11v6\" /><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /><path d=\"M3 6h18\" /><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" />","chevron-down":"<path d=\"m6 9 6 6 6-6\" />","database":"<ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /><path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /><path d=\"M3 12A9 3 0 0 0 21 12\" />","list-plus":"<path d=\"M16 5H3\" /><path d=\"M11 12H3\" /><path d=\"M16 19H3\" /><path d=\"M18 9v6\" /><path d=\"M21 12h-6\" />","undo-2":"<path d=\"M9 14 4 9l5-5\" /><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\" />","circle":"<circle cx=\"12\" cy=\"12\" r=\"10\" />"};
 function ic(name, size, cls) {
   const s = size || 20;
   return `<svg class="ic${cls ? ' ' + cls : ''}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -137,7 +131,7 @@ function motivoIcon(v, size) { const m = MOTIVOS.find(x => x.v === v); return ic
 function statusLabel(s, qa) { const m = STATUS[s]; return m ? (qa ? m.qa : m.colab) : s; }
 function perfil() { return state.user ? state.user.perfil : ''; }
 function pill(s, qa, o) { const m = STATUS[s] || { tone: 'gray' }; return `<span class="pill tone-${m.tone}"><i></i>${esc(qa && o ? stageLabel(o) : statusLabel(s, qa))}</span>`; }
-function isQA() { return !!state.user && EQUIPES.includes(state.user.perfil); }   // equipes internas usam o painel
+function isQA() { return !!state.user && PAINEL.includes(state.user.perfil); }   // Manutenção e Qualidade usam o painel
 function findOcc(p) { return state.occs.find(o => o.protocolo === p); }
 function upsertOcc(o) {
   const i = state.occs.findIndex(x => x.protocolo === o.protocolo);
@@ -426,7 +420,7 @@ function topbar() {
   return `<header class="topbar">${LOGO}
     <button class="avatar-btn" data-action="openPerfil" aria-label="Perfil e sair">${esc(initials(state.user.nome))}</button></header>`;
 }
-const SHORT = { aguardando_manutencao: 'Aguardando', correcao_solicitada: 'Corrigir', em_tratamento: 'Em andamento', aguardando_qualidade: 'Em andamento', encerrada: 'Finalizada' };
+const SHORT = { aguardando_manutencao: 'Aguardando', correcao_solicitada: 'Corrigir', aguardando_lancamento: 'Em andamento', aguardando_qualidade: 'Em andamento', encerrada: 'Finalizada' };
 function pillShort(s) { const m = STATUS[s] || { tone: 'gray' }; return `<span class="pill tone-${m.tone}"><i></i>${esc(SHORT[s] || s)}</span>`; }
 function occItem(o) {
   return `<button class="occ" data-action="openSheet" data-id="${esc(o.protocolo)}">
@@ -598,15 +592,14 @@ function timelineHtml(o) {
   return `<section class="rv"><header><h3>Histórico</h3></header><ol class="timeline">${h.map(e => `<li><i></i><div><b>${esc(e.acao)}</b><small>${fmtDT(e.ts)} · ${esc(e.usuario)}</small></div></li>`).join('')}</ol></section>`;
 }
 function trackSteps(o) {
-  const val = !!o.manutencao_validado_em, mec = !!o.mecanica_socorro, trp = o.transportes_lancado === 'sim', fim = o.status === 'encerrada';
-  const cor = o.status === 'correcao_solicitada';
-  return [
+  const respondeu = !!o.manut_socorro, socorro = o.manut_socorro === 'sim', fim = o.status === 'encerrada', cor = o.status === 'correcao_solicitada';
+  const passos = [
     { n: 'Registrada', i: 'file-check', st: 'done' },
-    { n: 'Manutenção', i: 'wrench', st: val ? 'done' : cor ? 'warn' : 'cur' },
-    { n: 'Mecânica', i: 'cog', st: mec ? 'done' : val ? 'cur' : 'todo' },
-    { n: 'Transportes', i: 'truck', st: trp ? 'done' : val ? 'cur' : 'todo' },
-    { n: 'Qualidade', i: 'badge-check', st: fim ? 'done' : o.status === 'aguardando_qualidade' ? 'cur' : 'todo' }
-  ].map(x => fim ? Object.assign(x, { st: 'done' }) : x);
+    { n: 'Manutenção', i: 'wrench', st: respondeu ? 'done' : cor ? 'warn' : 'cur' }
+  ];
+  if (!respondeu || socorro) passos.push({ n: 'Lançamento', i: 'truck', st: o.manut_lancado === 'sim' ? 'done' : socorro ? 'cur' : 'todo' });   // some quando não foi socorro
+  passos.push({ n: 'Qualidade', i: 'badge-check', st: fim ? 'done' : o.status === 'aguardando_qualidade' ? 'cur' : 'todo' });
+  return fim ? passos.map(x => Object.assign(x, { st: 'done' })) : passos;
 }
 function trackerHtml(o) {
   return `<ol class="etapas" aria-label="Andamento da ocorrência">${trackSteps(o).map(x => `<li class="${x.st}"><span>${ic(x.st === 'done' ? 'check' : x.st === 'warn' ? 'triangle-alert' : x.i, 18)}</span><b>${x.n}</b></li>`).join('')}</ol>`;
@@ -622,6 +615,7 @@ function sheetHtml() {
       ${trackerHtml(o)}
       ${o.status === 'correcao_solicitada' ? `<div class="alert warn"><b>${esc(o.correcao_por || 'A equipe')} pediu uma correção</b><p>${esc(o.correcao_mensagem)}</p>
         <button class="btn btn-primary btn-block" data-action="fixOcc" data-id="${esc(o.protocolo)}">Corrigir e reenviar</button></div>` : ''}
+      ${conversaHtml(o)}
       ${sections(o).map(sec => `<section class="rv"><header><h3>${sec.t}</h3></header>${rowsHtml(sec.rows)}</section>`).join('')}
       ${attachmentsHtml(o)}${timelineHtml(o)}
     </div></aside></div>`;
@@ -735,11 +729,11 @@ async function sync(silent) {
       if (isQA()) {
         const p = perfil(), fila = novas.filter(o => inQueue(o, p) && !filaAntes.has(o.protocolo)).length;
         if (primeira === false && fila) toast(fila === 1 ? 'Nova ocorrência na sua fila.' : `${fila} novas ocorrências na sua fila.`);
-        novas.forEach(o => { const antes = msgsAntes[o.protocolo]; const ult = (o.mensagens || []).slice(-1)[0];
-          if (antes !== undefined && (o.mensagens || []).length > antes && ult && ult.matricula !== state.user.matricula) toast(`Nova mensagem em ${o.protocolo}`); });
       } else {
         novas.forEach(o => { if (before[o.protocolo] && before[o.protocolo] !== o.status) toast(`${o.protocolo}: ${statusLabel(o.status, false)}`); });
       }
+      novas.forEach(o => { const antes = msgsAntes[o.protocolo]; const ult = (o.mensagens || []).slice(-1)[0];
+        if (antes !== undefined && (o.mensagens || []).length > antes && ult && ult.matricula !== state.user.matricula) toast(`Nova mensagem em ${o.protocolo}`); });
     }
     const mudou = JSON.stringify(novas) !== JSON.stringify(state.occs);
     if (r.data.listas) state.listas = r.data.listas;
@@ -909,7 +903,7 @@ const ACTIONS = {
   closeOverlay() { state.sheet = null; state.modal = null; state.qa.detail = null; state.picker = null; renderOverlays(); },
   closeModal() { state.modal = null; renderOverlays(); },
   refreshNow() { state.modal = null; renderOverlays(); sync(false); },
-  openSheet(ds) { state.sheet = ds.id; renderOverlays(); },
+  openSheet(ds) { state.sheet = ds.id; const o = findOcc(ds.id); if (o) qaResetDrafts(o); renderOverlays(); },
   openSheetAfter(ds) { state.route = 'minhas'; state.sheet = ds.id; render(); },
   fixOcc(ds) {
     const o = findOcc(ds.id); if (!o) return;
@@ -1018,21 +1012,21 @@ document.addEventListener('DOMContentLoaded', init);
    ========================================================= */
 
 function qaNavItems() {
-  const nav = [['dashboard', 'layout-dashboard', 'Dashboard'], ['ocorrencias', 'clipboard-list', 'Ocorrências'], ['pendencias', 'hourglass', 'Minha fila'],
-    ['historico', 'history', 'Histórico'], ['relatorios', 'chart-column', 'Relatórios']];
+  const nav = [['dashboard', 'layout-dashboard', 'Dashboard'], ['ocorrencias', 'clipboard-list', 'Ocorrências'], ['pendencias', 'hourglass', 'Minha fila']];
+  if (perfil() === 'qualidade') nav.push(['cobranca', 'triangle-alert', 'Cobrança']);
+  nav.push(['historico', 'history', 'Histórico'], ['relatorios', 'chart-column', 'Relatórios']);
   if (perfil() === 'qualidade') nav.push(['cadastros', 'database', 'Cadastros']);
   return nav;
 }
 function inQueue(o, p) {
-  if (p === 'manutencao') return o.status === 'aguardando_manutencao';
-  if (p === 'mecanica') return o.status === 'em_tratamento' && !o.mecanica_socorro;
-  if (p === 'transportes') return o.status === 'em_tratamento' && o.transportes_lancado !== 'sim';
+  if (p === 'manutencao') return o.status === 'aguardando_manutencao' || o.status === 'aguardando_lancamento';
   if (p === 'qualidade') return o.status === 'aguardando_qualidade';
+  if (p === 'transportes') return o.status === 'correcao_solicitada';
   return false;
 }
 function oldestFirst(list) { return list.slice().sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em))); }
 function myQueue() { return oldestFirst(state.occs.filter(o => inQueue(o, perfil()))); }
-const QA_TITLES = { dashboard: 'Dashboard', ocorrencias: 'Ocorrências', pendencias: 'Minha fila', historico: 'Histórico', relatorios: 'Relatórios', cadastros: 'Cadastros' };
+const QA_TITLES = { dashboard: 'Dashboard', ocorrencias: 'Ocorrências', pendencias: 'Minha fila', cobranca: 'Cobrança da Manutenção', historico: 'Histórico', relatorios: 'Relatórios', cadastros: 'Cadastros' };
 
 function qaEmptyFilters() { return { q: '', from: '', to: '', status: '', setor: '', linha: '', motivo: '', impacto: '', subst: '' }; }
 
@@ -1091,25 +1085,45 @@ function eventItem(e) {
 }
 
 /* ------------------------- Telas ------------------------- */
+function cobrancaLista() { return oldestFirst(state.occs.filter(o => o.cobravel)); }
 function qaDashboard() {
   const all = state.occs, p = perfil(); const c = s => all.filter(o => o.status === s).length;
   const kpi = (label, n, s, cls) => `<button class="kpi ${cls || ''}" data-action="qaKpi" data-s="${s}"><b>${n}</b><span>${label}</span></button>`;
-  const mine = myQueue();
+  const mine = myQueue(), cobr = cobrancaLista();
   const outras = oldestFirst(all.filter(o => o.status !== 'encerrada' && !inQueue(o, p)));
   const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
   const recentes = all.filter(o => o.data >= since);
-  return `<div class="kpis">${kpi('Aguardando Manutenção', c('aguardando_manutencao'), 'aguardando_manutencao', 'amber')}${kpi('Correção solicitada', c('correcao_solicitada'), 'correcao_solicitada', 'orange')}
-    ${kpi('Em tratamento', c('em_tratamento'), 'em_tratamento', 'blue')}${kpi('Aguardando Qualidade', c('aguardando_qualidade'), 'aguardando_qualidade', 'teal')}
+  return `<div class="kpis">${kpi('Aguardando Manutenção', c('aguardando_manutencao'), 'aguardando_manutencao', 'amber')}${kpi('Aguardando lançamento', c('aguardando_lancamento'), 'aguardando_lancamento', 'blue')}
+    ${kpi('Correção solicitada', c('correcao_solicitada'), 'correcao_solicitada', 'orange')}${kpi('Aguardando Qualidade', c('aguardando_qualidade'), 'aguardando_qualidade', 'teal')}
     ${kpi('Finalizadas', c('encerrada'), 'encerrada', 'green')}${kpi('Total', all.length, '', 'total')}</div>
     <div class="grid2"><div class="col">
+      ${p === 'qualidade' ? `<section class="panel"><header><h2>Para cobrar a Manutenção <small>parece socorro, sem lançamento</small></h2><span class="count ${cobr.length ? 'alert' : ''}">${cobr.length}</span></header>
+        ${qaTable(cobr.slice(0, 5), { compact: true, empty: 'Nada para cobrar no momento.' })}
+        ${cobr.length > 5 ? `<footer><button class="link" data-action="qaNav" data-v="cobranca">Ver as ${cobr.length} ocorrências</button></footer>` : ''}</section>` : ''}
       <section class="panel"><header><h2>Minha fila <small>${ROLE_LABEL[p]}</small></h2><span class="count">${mine.length}</span></header>
-        ${qaTable(mine.slice(0, 6), { compact: true, empty: 'Nada aguardando a sua equipe. Tudo em dia.' })}
+        ${qaTable(mine.slice(0, 6), { compact: true, empty: p === 'qualidade' ? 'Nada pronto para finalizar.' : 'Nada aguardando a sua equipe. Tudo em dia.' })}
         ${mine.length > 6 ? `<footer><button class="link" data-action="qaNav" data-v="pendencias">Ver as ${mine.length} ocorrências</button></footer>` : ''}</section>
       <section class="panel"><header><h2>Em andamento nas outras etapas</h2></header>${qaTable(outras.slice(0, 5), { compact: true, empty: 'Nenhuma outra ocorrência em andamento.' })}</section>
     </div><div class="col">
       <section class="panel"><header><h2>Motivos <small>últimos 30 dias</small></h2></header><div class="pad">${bars(countBy(recentes, o => o.motivo).slice(0, 8))}</div></section>
       <section class="panel"><header><h2>Atividade recente</h2></header><ol class="events">${qaEvents(8).map(eventItem).join('') || '<div class="empty small"><span>—</span>Sem atividade.</div>'}</ol></section>
     </div></div>`;
+}
+
+/** Cobrança: ocorrências que parecem socorro e a Manutenção ainda não lançou (mesma lista da aba "Cobrança Manutenção"). */
+function qaCobranca() {
+  const lista = cobrancaLista();
+  const linhas = lista.map(o => `<tr tabindex="0" role="button" data-action="qaOpen" data-id="${esc(o.protocolo)}">
+    <td data-l="Protocolo"><b class="mono">${esc(o.protocolo)}</b><small>${fmtDate(o.data)} ${esc(o.hora)}</small></td><td data-l="Veículo">${esc(o.veiculo)}</td>
+    <td data-l="Motivo"><span class="mi">${motivoIcon(o.motivo, 16)}</span> ${esc(o.motivo)}</td>
+    <td data-l="Pendente"><span class="age ${Date.now() - new Date(o.criado_em) > 4 * 3600000 ? 'late' : ''}">${ago(o.criado_em)}</span></td>
+    <td data-l="Cobranças">${Number(o.cobrancas || 0) ? `${o.cobrancas}× · ${ago(o.cobrado_em)}` : '—'}</td>
+    <td data-l="Status">${pill(o.status, true, o)}</td>
+    <td class="act-cell"><button class="btn btn-sm btn-primary" data-action="qaCobrarRapido" data-id="${esc(o.protocolo)}" ${state.busy ? 'disabled' : ''}>${ic('triangle-alert', 15)} Cobrar</button></td></tr>`).join('');
+  return `<section class="panel"><header><h2>Cobrança da Manutenção <small>parece socorro e ainda sem lançamento</small></h2><span class="count ${lista.length ? 'alert' : ''}">${lista.length}</span></header>
+    <div class="pad hint-box">${ic('info', 18)}<p>Esta é a mesma lista da aba <b>“Cobrança Manutenção”</b> da planilha. A ocorrência entra aqui quando, pelo cadastro, parece socorro (não voltou sozinho, foi rebocado, houve substituição ou a Manutenção foi ao local) e a Manutenção ainda não fez o lançamento. Sai sozinha quando a Manutenção lança ou conclui que não foi socorro. Ao cobrar, a mensagem fica na conversa e no histórico da ocorrência.</p></div>
+    ${lista.length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>Protocolo</th><th>Veículo</th><th>Motivo</th><th>Pendente há</th><th>Cobranças</th><th>Status</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>`
+      : `<div class="empty"><span>${ic('circle-check', 32)}</span>Nada para cobrar. Tudo que parece socorro já foi lançado.</div>`}</section>`;
 }
 
 function qaFiltersPanel() {
@@ -1138,9 +1152,9 @@ function qaOcorrencias() {
 function qaPendencias() {
   const mine = myQueue(), cor = oldestFirst(state.occs.filter(o => o.status === 'correcao_solicitada'));
   const block = (t, sub, list, empty) => `<section class="panel"><header><h2>${t} <small>${sub}</small></h2><span class="count">${list.length}</span></header>${qaTable(list, { empty })}</section>`;
-  const guia = { manutencao: 'valide ou devolva ao colaborador', mecanica: 'analise se é socorro e informe o nº Fluig', transportes: 'faça o lançamento e confirme', qualidade: 'confira e finalize com o nº Fluig' }[perfil()];
-  return block('Minha fila', guia, mine, 'Nada aguardando a sua equipe. Tudo em dia.') +
-    block('Correção solicitada', 'aguardando o colaborador', cor, 'Nenhuma correção pendente.');
+  const guia = { manutencao: 'diga se foi socorro e faça o lançamento', qualidade: 'confira e finalize com o nº do Fluig' }[perfil()];
+  return block('Minha fila', guia, mine, perfil() === 'qualidade' ? 'Nada pronto para finalizar.' : 'Nada aguardando a sua equipe. Tudo em dia.') +
+    block('Correção solicitada', 'aguardando o Transportes corrigir', cor, 'Nenhuma correção pendente.');
 }
 function qaHistorico() {
   const ev = qaEvents(150); if (!ev.length) return `<div class="empty"><span>${ic('history', 32)}</span>Ainda não há atividade registrada.</div>`;
@@ -1159,7 +1173,7 @@ function qaStats(list) {
   const media = tempos.length ? (tempos.reduce((a, b) => a + b, 0) / tempos.length) : null;
   return { n, pass: pc(o => o.possui_passageiros === 'sim'), bald: pc(o => o.houve_baldeio === 'sim'), imp: pc(o => o.houve_impacto_horario === 'sim'),
     subst: pc(o => o.houve_substituicao === 'sim'), rem: pc(o => o.houve_remocao === 'sim'),
-    socorro: (() => { const r = list.filter(o => o.mecanica_socorro); return r.length ? Math.round(r.filter(o => o.mecanica_socorro === 'sim').length / r.length * 100) + '%' : '—'; })(),
+    socorro: (() => { const r = list.filter(o => o.manut_socorro); return r.length ? Math.round(r.filter(o => o.manut_socorro === 'sim').length / r.length * 100) + '%' : '—'; })(),
     media: media === null ? '—' : media < 1 ? Math.round(media * 60) + ' min' : media.toFixed(1).replace('.', ',') + ' h' };
 }
 function qaRelatorios() {
@@ -1198,9 +1212,9 @@ function qaCadastros() {
 }
 
 function renderQualidade() {
-  const v = state.qa.view; const pend = myQueue().length;
-  const navBtn = (n, cls) => `<button class="${cls} ${v === n[0] ? 'on' : ''}" data-action="qaNav" data-v="${n[0]}"><span class="ti">${ic(n[1], 20)}</span><em>${n[2]}</em>${n[0] === 'pendencias' && pend ? `<i class="nb">${pend}</i>` : ''}</button>`;
-  const content = state.loadingData ? '<div class="skel big"></div><div class="skel big"></div><div class="skel"></div>' : v === 'dashboard' ? qaDashboard() : v === 'ocorrencias' ? qaOcorrencias() : v === 'pendencias' ? qaPendencias() : v === 'historico' ? qaHistorico() : v === 'cadastros' ? qaCadastros() : qaRelatorios();
+  const v = state.qa.view; const pend = myQueue().length, cobrar = perfil() === 'qualidade' ? state.occs.filter(o => o.cobravel).length : 0;
+  const navBtn = (n, cls) => `<button class="${cls} ${v === n[0] ? 'on' : ''}" data-action="qaNav" data-v="${n[0]}"><span class="ti">${ic(n[1], 20)}</span><em>${n[2]}</em>${n[0] === 'pendencias' && pend ? `<i class="nb">${pend}</i>` : ''}${n[0] === 'cobranca' && cobrar ? `<i class="nb">${cobrar}</i>` : ''}</button>`;
+  const content = state.loadingData ? '<div class="skel big"></div><div class="skel big"></div><div class="skel"></div>' : v === 'dashboard' ? qaDashboard() : v === 'ocorrencias' ? qaOcorrencias() : v === 'pendencias' ? qaPendencias() : v === 'historico' ? qaHistorico() : v === 'cadastros' ? qaCadastros() : v === 'cobranca' ? qaCobranca() : qaRelatorios();
   const sync = state.lastSync ? `Atualizado há ${ago(new Date(state.lastSync).toISOString())}` : '';
   return `<div class="qa"><aside class="qa-side"><div class="qa-brand">${LOGO}</div>
       <nav>${qaNavItems().map(n => navBtn(n, 'nav')).join('')}</nav>
@@ -1213,7 +1227,7 @@ function renderQualidade() {
     <nav class="qa-bottom">${qaNavItems().map(n => navBtn(n, 'bn')).join('')}</nav></div>`;
 }
 
-/* ------------------------- Detalhe da ocorrência (equipes) ------------------------- */
+/* ------------------------- Detalhe da ocorrência (Manutenção e Qualidade) ------------------------- */
 function qaOverlayHtml() {
   let html = '';
   const o = state.qa.detail ? findOcc(state.qa.detail) : null;
@@ -1224,57 +1238,55 @@ function qaOverlayHtml() {
 }
 function kvLine(l, v) { return v ? `<div class="kv"><span>${esc(l)}</span><b>${esc(v)}</b></div>` : ''; }
 function respostasHtml(o) {
-  const man = o.manutencao_validado_em ? kvLine('Manutenção', `Validada por ${o.manutencao_validado_por} · ${fmtDT(o.manutencao_validado_em)}`) : kvLine('Manutenção', 'Aguardando validação');
-  const mec = o.mecanica_socorro
-    ? kvLine('Mecânica', o.mecanica_socorro === 'sim' ? `É socorro · Fluig ${o.numero_socorro} · ${o.mecanica_por}` : `Não é socorro · ${o.mecanica_por}`) + kvLine('Parecer da Mecânica', o.mecanica_parecer)
-    : kvLine('Mecânica', 'Aguardando análise');
-  const trp = o.transportes_lancado === 'sim' ? kvLine('Transportes', `Lançado por ${o.transportes_por} · ${fmtDT(o.transportes_em)}`) + kvLine('Obs. do Transportes', o.transportes_obs) : kvLine('Transportes', 'Aguardando lançamento');
-  const qa = o.status === 'encerrada' ? kvLine('Qualidade', `Finalizada por ${o.responsavel_qualidade} · ${fmtDT(o.data_lancamento_socorro)}`) + kvLine('Observação da Qualidade', o.observacao_qualidade) : '';
-  return `<section class="rv"><header><h3>Respostas das equipes</h3></header>${man}${mec}${trp}${qa}</section>`;
+  const man = o.manut_socorro
+    ? kvLine('Manutenção', o.manut_socorro === 'sim' ? `Foi socorro · ${o.manut_por}` : `Não foi socorro · ${o.manut_por}`) + kvLine('Parecer da Manutenção', o.manut_parecer)
+    : kvLine('Manutenção', 'Aguardando análise');
+  const lan = o.manut_socorro === 'sim'
+    ? (o.manut_lancado === 'sim' ? kvLine('Lançamento no Fluig', `Realizado por ${o.manut_lancado_por} · ${fmtDT(o.manut_lancado_em)}`) : kvLine('Lançamento no Fluig', 'Pendente')) + kvLine('Nº Fluig informado pela Manutenção', o.manut_fluig)
+    : '';
+  const cobr = Number(o.cobrancas || 0) ? kvLine('Cobranças da Qualidade', `${o.cobrancas} · última ${fmtDT(o.cobrado_em)}`) : '';
+  const fim = o.status === 'encerrada' ? kvLine('Qualidade', `Finalizada por ${o.responsavel_qualidade} · ${fmtDT(o.data_lancamento_socorro)}`) + kvLine('Nº Fluig final', o.numero_socorro) + kvLine('Observação da Qualidade', o.observacao_qualidade) : '';
+  return `<section class="rv"><header><h3>Andamento</h3>${o.parece_socorro ? `<span class="tag">${ic('triangle-alert', 13)} parece socorro</span>` : ''}</header>${man}${lan}${cobr}${fim}</section>`;
 }
 function conversaHtml(o) {
   const ms = o.mensagens || [], busy = state.busy;
-  return `<section class="rv chat"><header><h3>Conversa entre as equipes</h3><small class="tiny muted">o colaborador não vê</small></header>
-    <div class="msgs">${ms.length ? ms.map(m => `<div class="msg ${m.matricula === state.user.matricula ? 'me' : ''}"><b>${esc(m.usuario)} <em>${esc(ROLE_LABEL[m.equipe] || m.equipe)}</em></b><p>${esc(m.texto)}</p><small>${fmtDT(m.ts)}</small></div>`).join('')
+  return `<section class="rv chat"><header><h3>Conversa entre as equipes</h3><small class="tiny muted">Transportes · Manutenção · Qualidade</small></header>
+    <div class="msgs">${ms.length ? ms.map(m => `<div class="msg ${m.matricula === state.user.matricula ? 'me' : ''} ${String(m.texto).startsWith('COBRANÇA') ? 'cobr' : ''}"><b>${esc(m.usuario)} <em>${esc(ROLE_LABEL[m.equipe] || m.equipe)}</em></b><p>${esc(m.texto)}</p><small>${fmtDT(m.ts)}</small></div>`).join('')
       : '<p class="muted tiny pad">Nenhuma mensagem ainda. Use este espaço para tirar dúvidas com as outras equipes.</p>'}</div>
     <div class="composer"><textarea data-qa="msg" rows="2" maxlength="1000" placeholder="Escreva para as outras equipes…">${esc(state.qa.drafts.msg)}</textarea>
       <button class="btn btn-primary" data-action="qaMsg" ${busy ? 'disabled' : ''}>${ic('send', 18)} Enviar</button></div></section>`;
 }
 function actBox(titulo, texto, corpo) { return `<section class="act"><h3>${titulo}</h3>${texto ? `<p>${texto}</p>` : ''}${corpo}</section>`; }
 function actionBox(o) {
-  const p = perfil(), d = state.qa.drafts, busy = state.busy, ativa = ['em_tratamento', 'aguardando_qualidade'].includes(o.status);
+  const p = perfil(), d = state.qa.drafts, busy = state.busy;
   const spin = busy ? '<span class="spinner sm"></span>' : '';
-  if (o.status === 'encerrada') return actBox('Ocorrência finalizada', o.mecanica_socorro === 'sim' ? `Finalizada com o nº Fluig <b>${esc(o.numero_socorro)}</b>.` : 'Finalizada: a Mecânica concluiu que não é socorro.', '');
-  if (o.status === 'correcao_solicitada') return actBox('Aguardando o colaborador', `${esc(o.correcao_por || 'Uma equipe')} pediu a correção: <b>${esc(o.correcao_mensagem)}</b>`, '');
+  if (o.status === 'encerrada') return actBox('Ocorrência finalizada', o.manut_socorro === 'sim' ? `Finalizada com o nº Fluig <b>${esc(o.numero_socorro)}</b>.` : 'Finalizada: a Manutenção concluiu que não foi socorro.', '');
+  if (o.status === 'correcao_solicitada') return actBox('Aguardando o Transportes', `${esc(o.correcao_por || 'Uma equipe')} pediu a correção do cadastro: <b>${esc(o.correcao_mensagem)}</b>`, '');
   if (p === 'manutencao') {
-    if (o.status === 'aguardando_manutencao') return actBox('Sua etapa: validar a ocorrência', 'Confira os dados abaixo. Se estiver correto, valide para liberar a Mecânica e o Transportes. Se algo estiver errado, devolva ao colaborador.',
-      `<div class="actions two"><button class="btn btn-white" data-action="qaManutValidar" ${busy ? 'disabled' : ''}>${spin}${ic('check', 18)} Validar</button><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção</button></div>`);
-    if (o.status === 'em_tratamento') return actBox('Validada pela Manutenção', 'A Mecânica e o Transportes estão atuando. Se perceber algum erro nos dados, ainda dá para pedir correção.', `<div class="actions"><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção</button></div>`);
-    return actBox('Validada pela Manutenção', 'Aguardando a finalização da Qualidade.', '');
-  }
-  if (p === 'mecanica') {
-    if (!ativa) return actBox('Sua etapa: analisar se é socorro', 'Disponível depois que a Manutenção validar a ocorrência.', '');
-    const sim = d.mec_socorro === 'sim', nao = d.mec_socorro === 'nao';
-    return actBox('Sua etapa: analisar se é socorro', 'Analise se esta ocorrência é mesmo um socorro. Se for, informe o nº do lançamento no Fluig. A resposta vai para a Qualidade.',
-      `<div class="duo"><button class="${sim ? 'on' : ''}" data-action="qaMecSocorro" data-v="sim">${ic('circle-check', 20)} É socorro</button><button class="${nao ? 'on' : ''}" data-action="qaMecSocorro" data-v="nao">${ic('circle-x', 20)} Não é socorro</button></div>
-      ${sim ? `<label class="lbl-w" for="mec-fluig">Nº do Fluig do lançamento</label><input id="mec-fluig" class="inp-w" data-qa="mec_fluig" value="${esc(d.mec_fluig)}" placeholder="Ex.: 458721" autocomplete="off">` : ''}
-      ${sim || nao ? `<label class="lbl-w" for="mec-parecer">Parecer ${nao ? '' : '<em>(opcional)</em>'}</label><textarea id="mec-parecer" class="inp-w area" data-qa="mec_parecer" rows="3" placeholder="${nao ? 'Explique por que não é socorro (obrigatório).' : 'Observações para a Qualidade.'}">${esc(d.mec_parecer)}</textarea>` : ''}
-      <button class="btn btn-white btn-block" data-action="qaMecEnviar" ${busy || (!sim && !nao) ? 'disabled' : ''}>${spin}${ic('send', 18)} ${o.mecanica_socorro ? 'Atualizar resposta' : 'Enviar resposta à Qualidade'}</button>`);
-  }
-  if (p === 'transportes') {
-    if (!ativa) return actBox('Sua etapa: lançar o ocorrido', 'Disponível depois que a Manutenção validar a ocorrência.', '');
-    if (o.transportes_lancado === 'sim') return actBox('Lançamento confirmado', `Registrado por ${esc(o.transportes_por)} em ${fmtDT(o.transportes_em)}.`, '');
-    return actBox('Sua etapa: lançar o ocorrido', 'Faça o lançamento do ocorrido e confirme aqui. Acontece sempre, em paralelo com a análise da Mecânica.',
-      `<label class="lbl-w" for="trp-obs">Observação <em>(opcional)</em></label><textarea id="trp-obs" class="inp-w area" data-qa="trp_obs" rows="2" placeholder="Ex.: Lançado no controle de frota.">${esc(d.trp_obs)}</textarea>
-      <button class="btn btn-white btn-block" data-action="qaTrpLancar" ${busy ? 'disabled' : ''}>${spin}${ic('circle-check', 18)} Confirmar lançamento</button>`);
+    const sim = d.man_socorro === 'sim', nao = d.man_socorro === 'nao', lanc = d.man_lancado === 'sim';
+    const respondida = !!o.manut_socorro;
+    const lancarBox = o.status === 'aguardando_lancamento'
+      ? `<div class="sub-act"><b>${ic('truck', 16)} Lançamento no Fluig pendente</b><p>Depois de lançar, marque aqui. Se já tiver o número do Fluig, pode informar (a Qualidade confere no final).</p>
+         <input id="man-fluig2" class="inp-w" data-qa="man_fluig" value="${esc(d.man_fluig)}" placeholder="Nº do Fluig (opcional)" autocomplete="off">
+         <button class="btn btn-white btn-block" data-action="qaManLancar" ${busy ? 'disabled' : ''}>${spin}${ic('circle-check', 18)} Marcar lançamento como realizado</button></div>` : '';
+    return actBox('Sua etapa: foi socorro?', 'Verifique se esta ocorrência foi mesmo um socorro e comunique a Qualidade. Se foi, faça o lançamento no Fluig. Se o cadastro estiver errado, devolva ao Transportes.',
+      `<div class="duo"><button class="${sim ? 'on' : ''}" data-action="qaManSocorro" data-v="sim">${ic('circle-check', 20)} Foi socorro</button><button class="${nao ? 'on' : ''}" data-action="qaManSocorro" data-v="nao">${ic('circle-x', 20)} Não foi socorro</button></div>
+      ${sim && o.status !== 'aguardando_lancamento' ? `<button type="button" class="check-w ${lanc ? 'on' : ''}" data-action="qaManLancadoToggle">${ic(lanc ? 'circle-check' : 'circle', 20)} Lançamento no Fluig já realizado</button>
+        ${lanc ? `<label class="lbl-w" for="man-fluig">Nº do Fluig <em>(opcional)</em></label><input id="man-fluig" class="inp-w" data-qa="man_fluig" value="${esc(d.man_fluig)}" placeholder="Ex.: 458721" autocomplete="off">` : ''}` : ''}
+      ${sim || nao ? `<label class="lbl-w" for="man-parecer">Parecer ${nao ? '' : '<em>(opcional)</em>'}</label><textarea id="man-parecer" class="inp-w area" data-qa="man_parecer" rows="3" placeholder="${nao ? 'Explique por que não foi socorro (obrigatório).' : 'Observações para a Qualidade.'}">${esc(d.man_parecer)}</textarea>` : ''}
+      <button class="btn btn-white btn-block" data-action="qaManResponder" ${busy || (!sim && !nao) ? 'disabled' : ''}>${spin}${ic('send', 18)} ${respondida ? 'Atualizar resposta à Qualidade' : 'Enviar resposta à Qualidade'}</button>
+      ${lancarBox}
+      <div class="actions" style="margin-top:12px"><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção ao Transportes</button></div>`);
   }
   if (p === 'qualidade') {
-    const pronto = o.status === 'aguardando_qualidade', sim = o.mecanica_socorro === 'sim';
-    const falta = []; if (!o.manutencao_validado_em) falta.push('Manutenção'); if (!o.mecanica_socorro) falta.push('Mecânica'); if (o.transportes_lancado !== 'sim') falta.push('Transportes');
-    const sec = `<div class="actions two"><button class="btn btn-ghost-w" data-action="qaDevolverOpen" ${busy ? 'disabled' : ''}>${ic('undo-2', 18)} Devolver para uma equipe</button><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção ao colaborador</button></div>`;
-    if (!pronto) return actBox('Sua etapa: finalizar', `Ainda falta: <b>${esc(falta.join(', '))}</b>. Quando todas responderem, você finaliza aqui.`, sec);
-    return actBox('Sua etapa: finalizar a ocorrência', sim ? 'A Mecânica confirmou o socorro. Confira o nº do Fluig e finalize.' : 'A Mecânica concluiu que não é socorro. Basta finalizar.',
-      `${sim ? `<label class="lbl-w" for="fin-num">Nº do Fluig</label><input id="fin-num" class="inp-w" data-qa="fin_num" value="${esc(d.fin_num == null ? (o.numero_socorro || '') : d.fin_num)}" placeholder="Ex.: 458721" autocomplete="off">` : ''}
+    const pronto = o.status === 'aguardando_qualidade', sim = o.manut_socorro === 'sim';
+    const sec = `<div class="actions two"><button class="btn btn-ghost-w" data-action="qaDevolverOpen" ${busy || !o.manut_socorro ? 'disabled' : ''}>${ic('undo-2', 18)} Devolver à Manutenção</button><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção ao Transportes</button></div>`;
+    if (o.cobravel) return actBox('Você acompanha: falta a Manutenção', `Pelo cadastro <b>parece socorro</b> e a Manutenção ${o.manut_socorro ? 'ainda não fez o lançamento no Fluig' : 'ainda não respondeu nem lançou'}. Você pode cobrar.`,
+      `<label class="lbl-w" for="cob-msg">Mensagem da cobrança <em>(opcional)</em></label><textarea id="cob-msg" class="inp-w area" data-qa="cob_msg" rows="2" placeholder="Ex.: Favor lançar até o fim do turno.">${esc(d.cob_msg)}</textarea>
+       <button class="btn btn-white btn-block" data-action="qaCobrar" ${busy ? 'disabled' : ''}>${spin}${ic('triangle-alert', 18)} Cobrar a Manutenção</button>${sec}`);
+    if (!pronto) return actBox('Você acompanha esta ocorrência', o.status === 'aguardando_manutencao' ? 'A Manutenção ainda vai verificar se foi socorro. Não parece socorro pelo cadastro, então não há cobrança.' : 'Aguardando a Manutenção.', sec);
+    return actBox('Sua etapa: finalizar a ocorrência', sim ? 'A Manutenção confirmou o socorro e fez o lançamento. Coloque o nº do Fluig e finalize.' : 'A Manutenção concluiu que não foi socorro. Basta finalizar.',
+      `${sim ? `<label class="lbl-w" for="fin-num">Nº do Fluig</label><input id="fin-num" class="inp-w" data-qa="fin_num" value="${esc(d.fin_num == null ? (o.manut_fluig || '') : d.fin_num)}" placeholder="Ex.: 458721" autocomplete="off">` : ''}
       <label class="lbl-w" for="fin-obs">Observação da Qualidade <em>(opcional)</em></label><textarea id="fin-obs" class="inp-w area" data-qa="fin_obs" rows="2" placeholder="Ex.: Conferido no Fluig.">${esc(d.fin_obs)}</textarea>
       <button class="btn btn-white btn-block" data-action="qaFinalizar" ${busy ? 'disabled' : ''}>${spin}${ic('badge-check', 18)} Finalizar ocorrência</button>${sec}`);
   }
@@ -1282,10 +1294,10 @@ function actionBox(o) {
 }
 function qaDrawer(o) {
   return `<div data-ov="drawer:${o.protocolo}" class="scrim right" data-action="closeOverlay" data-self="1"><aside class="drawer" role="dialog" aria-label="Ocorrência ${esc(o.protocolo)}">
-    <header class="drawer-head"><div><h2>${esc(o.protocolo)}</h2><small class="muted">${fmtDate(o.data)} às ${esc(o.hora)} · registrada por ${esc(o.criado_por)} (${esc(o.matricula_criador)})</small></div>
+    <header class="drawer-head"><div><h2>${esc(o.protocolo)}</h2><small class="muted">${fmtDate(o.data)} às ${esc(o.hora)} · cadastrada por ${esc(o.criado_por)} (${esc(o.matricula_criador)})</small></div>
       <button class="icon-btn" data-action="closeOverlay" aria-label="Fechar">${ic('x', 20)}</button></header>
     <div class="drawer-body">
-      <div class="row-between">${pill(o.status, true, o)}<small class="muted">Registrada há ${ago(o.criado_em)}</small></div>
+      <div class="row-between">${pill(o.status, true, o)}<small class="muted">Cadastrada há ${ago(o.criado_em)}</small></div>
       ${trackerHtml(o)}
       ${actionBox(o)}
       ${respostasHtml(o)}
@@ -1296,8 +1308,8 @@ function qaDrawer(o) {
 }
 function correcaoModal() {
   const o = findOcc(state.modal.id); const busy = state.busy;
-  return `<div data-ov="correcao:${state.modal.id}" class="scrim center-modal" data-action="closeModal" data-self="1"><div class="modal"><h2>Pedir correção ao colaborador</h2>
-    <p class="muted">${esc(o ? o.protocolo : '')} · o colaborador verá este texto no aplicativo e a ocorrência volta para a validação da Manutenção.</p>
+  return `<div data-ov="correcao:${state.modal.id}" class="scrim center-modal" data-action="closeModal" data-self="1"><div class="modal"><h2>Pedir correção ao Transportes</h2>
+    <p class="muted">${esc(o ? o.protocolo : '')} · o Transportes verá este texto no aplicativo e a ocorrência volta para a análise da Manutenção depois de corrigida.</p>
     <label class="lbl" for="qa-cor">O que precisa ser corrigido?</label>
     <textarea id="qa-cor" class="inp area" data-qa="correcao" rows="4" placeholder="Ex.: Favor corrigir o local da ocorrência.">${esc(state.qa.drafts.correcao)}</textarea>
     <div class="stack"><button class="btn btn-primary btn-block" data-action="qaCorrecaoSend" ${busy ? 'disabled' : ''}>Enviar pedido de correção</button>
@@ -1305,12 +1317,10 @@ function correcaoModal() {
 }
 function devolverModal() {
   const o = findOcc(state.modal.id), d = state.qa.drafts, busy = state.busy;
-  const opt = (v, t, ico) => `<button class="choice ${d.dev_alvo === v ? 'on' : ''}" data-action="qaDevAlvo" data-v="${v}"><i></i>${ic(ico, 18)} ${t}</button>`;
-  return `<div data-ov="devolver:${state.modal.id}" class="scrim center-modal" data-action="closeModal" data-self="1"><div class="modal"><h2>Devolver para uma equipe</h2>
-    <p class="muted">${esc(o ? o.protocolo : '')} · a etapa dessa equipe volta a ficar pendente e a mensagem aparece na conversa.</p>
-    <div class="choices tight">${opt('manutencao', 'Manutenção (revalidar)', 'wrench')}${opt('mecanica', 'Mecânica (refazer análise)', 'cog')}${opt('transportes', 'Transportes (refazer lançamento)', 'truck')}</div>
+  return `<div data-ov="devolver:${state.modal.id}" class="scrim center-modal" data-action="closeModal" data-self="1"><div class="modal"><h2>Devolver à Manutenção</h2>
+    <p class="muted">${esc(o ? o.protocolo : '')} · a Manutenção precisa responder de novo e a mensagem aparece na conversa.</p>
     <label class="lbl" for="qa-dev">Motivo da devolução</label>
-    <textarea id="qa-dev" class="inp area" data-qa="dev_msg" rows="3" placeholder="Explique o que precisa ser refeito.">${esc(d.dev_msg)}</textarea>
+    <textarea id="qa-dev" class="inp area" data-qa="dev_msg" rows="3" placeholder="Explique o que a Manutenção precisa rever.">${esc(d.dev_msg)}</textarea>
     <div class="stack"><button class="btn btn-primary btn-block" data-action="qaDevolverSend" ${busy ? 'disabled' : ''}>Devolver</button>
       <button class="btn btn-ghost btn-block" data-action="closeModal">Cancelar</button></div></div></div>`;
 }
@@ -1318,9 +1328,9 @@ function devolverModal() {
 /* ------------------------- Interação ------------------------- */
 function qaResetDrafts(o) {
   state.qa.draftFor = o.protocolo;
-  state.qa.drafts = { msg: '', correcao: '', dev_alvo: 'mecanica', dev_msg: '', trp_obs: '',
-    mec_socorro: o.mecanica_socorro || '', mec_fluig: o.mecanica_socorro === 'sim' ? (o.numero_socorro || '') : '', mec_parecer: o.mecanica_parecer || '',
-    fin_num: null, fin_obs: o.observacao_qualidade || '' };   // fin_num null = ainda não mexeu: usa o nº Fluig da Mecânica
+  state.qa.drafts = { msg: '', correcao: '', dev_msg: '', cob_msg: '',
+    man_socorro: o.manut_socorro || '', man_lancado: o.manut_lancado || '', man_fluig: o.manut_fluig || '', man_parecer: o.manut_parecer || '',
+    fin_num: null, fin_obs: o.observacao_qualidade || '' };   // fin_num null = ainda não mexeu: usa o nº Fluig informado pela Manutenção
 }
 function qaRefreshResults() {
   const el = document.getElementById('qa-results'); if (el) el.innerHTML = qaResults();
@@ -1360,8 +1370,8 @@ function exportCsv(list, nome) {
     ['detalhamento_substituicao', 'Detalhe do local'], ['veiculo_substituto', 'Veículo substituto'], ['motorista_substituto', 'Motorista substituto'],
     ['manutencao_acionada', 'Manutenção acionada', yn], ['manutencao_deslocou', 'Manutenção deslocou', yn], ['retorno_proprio', 'Retorno próprio', yn],
     ['houve_remocao', 'Remoção', yn], ['tipo_remocao', 'Tipo de remoção'], ['motivo', 'Motivo'], ['descricao_motivo', 'Descrição do motivo'], ['observacoes', 'Observações'],
-    ['numero_socorro', 'Nº Fluig'], ['status', 'Status', s => statusLabel(s, true)], ['manutencao_validado_por', 'Manutenção: validado por'], ['mecanica_socorro', 'Mecânica: é socorro?', yn], ['mecanica_parecer', 'Mecânica: parecer'],
-    ['transportes_lancado', 'Transportes: lançado?', yn], ['transportes_por', 'Transportes: lançado por'], ['responsavel_qualidade', 'Finalizado por (Qualidade)'],
+    ['numero_socorro', 'Nº Fluig'], ['status', 'Status', s => statusLabel(s, true)], ['manut_socorro', 'Manutenção: foi socorro?', yn], ['manut_parecer', 'Manutenção: parecer'], ['manut_por', 'Manutenção: respondido por'],
+    ['manut_lancado', 'Manutenção: lançamento no Fluig?', yn], ['cobrancas', 'Cobranças da Qualidade'], ['responsavel_qualidade', 'Finalizado por (Qualidade)'],
     ['data_lancamento_socorro', 'Finalizado em', fmtDT], ['observacao_qualidade', 'Observação da Qualidade'], ['criado_por', 'Criado por'], ['criado_em', 'Criado em', fmtDT]];
   const head = cols.map(c => csvCell(c[1])).join(';');
   const body = list.map(o => cols.map(c => csvCell(c[2] ? (c[2] === yn && !o[c[0]] ? '' : c[2](o[c[0]])) : o[c[0]])).join(';'));
@@ -1412,36 +1422,42 @@ Object.assign(ACTIONS, {
   qaExport() { exportCsv(sortRecent(qaFilter(state.occs, state.qa.f)), 'univale-ocorrencias'); },
   qaExportRel() { const r = relRange(); exportCsv(sortRecent(state.occs.filter(o => o.data >= r.from && o.data <= r.to)), 'univale-relatorio'); },
   qaOpen(ds) { const o = findOcc(ds.id); if (!o) return; state.qa.detail = o.protocolo; state.modal = null; qaResetDrafts(o); renderOverlays(); },
-  qaManutValidar() { const o = findOcc(state.qa.detail); if (o) qaCall('manutencaoValidar', { protocolo: o.protocolo }, 'Validada. Mecânica e Transportes foram liberados.'); },
   qaCorrecaoOpen() { state.qa.drafts.correcao = ''; state.modal = { type: 'correcao', id: state.qa.detail }; renderOverlays(); },
   qaCorrecaoSend() {
     const m = (state.qa.drafts.correcao || '').trim();
     if (!m) return toast('Descreva o que precisa ser corrigido.', 'error');
-    qaCall('correcao', { protocolo: state.modal.id, mensagem: m }, 'Pedido de correção enviado ao colaborador.');
+    qaCall('correcao', { protocolo: state.modal.id, mensagem: m }, 'Pedido de correção enviado ao Transportes.');
   },
-  qaMecSocorro(ds) { state.qa.drafts.mec_socorro = ds.v; renderOverlays(); },
-  qaMecEnviar() {
+  qaManSocorro(ds) { state.qa.drafts.man_socorro = ds.v; renderOverlays(); },
+  qaManLancadoToggle() { const d = state.qa.drafts; d.man_lancado = d.man_lancado === 'sim' ? '' : 'sim'; renderOverlays(); },
+  qaManResponder() {
     const o = findOcc(state.qa.detail), d = state.qa.drafts; if (!o) return;
-    if (!d.mec_socorro) return toast('Escolha: é socorro ou não é socorro.', 'error');
-    if (d.mec_socorro === 'sim' && !(d.mec_fluig || '').trim()) return toast('Informe o nº do Fluig.', 'error');
-    if (d.mec_socorro === 'nao' && (d.mec_parecer || '').trim().length < 5) return toast('Explique por que não é socorro.', 'error');
-    qaCall('mecanicaResponder', { protocolo: o.protocolo, socorro: d.mec_socorro, fluig: d.mec_socorro === 'sim' ? d.mec_fluig : '', parecer: d.mec_parecer || '' }, 'Resposta enviada à Qualidade.');
+    if (!d.man_socorro) return toast('Escolha: foi socorro ou não foi socorro.', 'error');
+    if (d.man_socorro === 'nao' && (d.man_parecer || '').trim().length < 5) return toast('Explique por que não foi socorro.', 'error');
+    qaCall('manutencaoResponder', { protocolo: o.protocolo, socorro: d.man_socorro, parecer: d.man_parecer || '', lancado: d.man_socorro === 'sim' && d.man_lancado === 'sim', fluig: d.man_socorro === 'sim' ? (d.man_fluig || '') : '' }, 'Resposta enviada à Qualidade.');
   },
-  qaTrpLancar() { const o = findOcc(state.qa.detail); if (o) qaCall('transportesLancar', { protocolo: o.protocolo, obs: state.qa.drafts.trp_obs || '' }, 'Lançamento confirmado.'); },
+  qaManLancar() { const o = findOcc(state.qa.detail); if (o) qaCall('manutencaoLancar', { protocolo: o.protocolo, fluig: state.qa.drafts.man_fluig || '' }, 'Lançamento registrado. A Qualidade foi avisada.'); },
+  qaCobrar() { const o = findOcc(state.qa.detail); if (o) qaCall('cobrar', { protocolo: o.protocolo, mensagem: state.qa.drafts.cob_msg || '' }, 'Cobrança enviada à Manutenção.'); },
+  async qaCobrarRapido(ds) {
+    if (state.busy) return; state.busy = true; render();
+    const r = await API.call('cobrar', { protocolo: ds.id }); state.busy = false;
+    if (r.ok) { upsertOcc(r.data.ocorrencia); toast('Cobrança enviada à Manutenção.'); }
+    else if (r.code === 'AUTH') return doLogout(r.message); else toast(r.message || 'Não foi possível cobrar.', 'error');
+    render();
+  },
   qaFinalizar() {
     const o = findOcc(state.qa.detail), d = state.qa.drafts; if (!o) return;
-    const num = String(d.fin_num == null ? (o.numero_socorro || '') : d.fin_num).trim();
-    if (o.mecanica_socorro === 'sim' && !num) return toast('Informe o nº do Fluig para finalizar.', 'error');
+    const num = String(d.fin_num == null ? (o.manut_fluig || '') : d.fin_num).trim();
+    if (o.manut_socorro === 'sim' && !num) return toast('Informe o nº do Fluig para finalizar.', 'error');
     qaCall('finalizar', { protocolo: o.protocolo, numero: num, observacao: d.fin_obs || '' }, 'Ocorrência finalizada.');
   },
   qaDevolverOpen() { state.qa.drafts.dev_msg = ''; state.modal = { type: 'devolver', id: state.qa.detail }; renderOverlays(); },
-  qaDevAlvo(ds) { state.qa.drafts.dev_alvo = ds.v; renderOverlays(); },
   qaDevolverSend() {
     const d = state.qa.drafts; if (!(d.dev_msg || '').trim()) return toast('Explique o motivo da devolução.', 'error');
-    qaCall('devolver', { protocolo: state.modal.id, alvo: d.dev_alvo, mensagem: d.dev_msg }, 'Devolvida para ' + ROLE_LABEL[d.dev_alvo] + '.');
+    qaCall('devolver', { protocolo: state.modal.id, mensagem: d.dev_msg }, 'Devolvida à Manutenção.');
   },
   async qaMsg() {
-    const o = findOcc(state.qa.detail), t = (state.qa.drafts.msg || '').trim(); if (!o) return;
+    const proto = state.qa.detail || state.sheet, o = proto ? findOcc(proto) : null, t = (state.qa.drafts.msg || '').trim(); if (!o) return;
     if (!t) return toast('Escreva a mensagem.', 'error');
     await qaCall('mensagem', { protocolo: o.protocolo, texto: t }, '', true);
     if (findOcc(o.protocolo)) { state.qa.drafts.msg = ''; renderOverlays(); }

@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 const CFG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbxpD-DA4aH1n2f84oQ45aKtsE6g7kHBUlgrQHoKziHtkzgDTbZaHhlVrm85G3ppruGK/exec',
+  API_URL: '',
   REFRESH_MS: 45000,     // atualização automática dos dados (ms)
   MAX_ANEXO_MB: 6,       // tamanho máximo de cada anexo
   MAX_ANEXOS: 5          // anexos por ocorrência
@@ -1115,14 +1115,13 @@ function qaCobranca() {
   const lista = cobrancaLista();
   const linhas = lista.map(o => `<tr tabindex="0" role="button" data-action="qaOpen" data-id="${esc(o.protocolo)}">
     <td data-l="Protocolo"><b class="mono">${esc(o.protocolo)}</b><small>${fmtDate(o.data)} ${esc(o.hora)}</small></td><td data-l="Veículo">${esc(o.veiculo)}</td>
+    <td data-l="Impediu garagem?">${o.retorno_proprio === 'nao' ? 'Sim' : 'Não'}</td>
     <td data-l="Motivo"><span class="mi">${motivoIcon(o.motivo, 16)}</span> ${esc(o.motivo)}</td>
     <td data-l="Pendente"><span class="age ${Date.now() - new Date(o.criado_em) > 4 * 3600000 ? 'late' : ''}">${ago(o.criado_em)}</span></td>
-    <td data-l="Cobranças">${Number(o.cobrancas || 0) ? `${o.cobrancas}× · ${ago(o.cobrado_em)}` : '—'}</td>
-    <td data-l="Status">${pill(o.status, true, o)}</td>
-    <td class="act-cell"><button class="btn btn-sm btn-primary" data-action="qaCobrarRapido" data-id="${esc(o.protocolo)}" ${state.busy ? 'disabled' : ''}>${ic('triangle-alert', 15)} Cobrar</button></td></tr>`).join('');
+    <td data-l="Status">${pill(o.status, true, o)}</td></tr>`).join('');
   return `<section class="panel"><header><h2>Cobrança da Manutenção <small>parece socorro e ainda sem lançamento</small></h2><span class="count ${lista.length ? 'alert' : ''}">${lista.length}</span></header>
-    <div class="pad hint-box">${ic('info', 18)}<p>Esta é a mesma lista da aba <b>“Cobrança Manutenção”</b> da planilha. A ocorrência entra aqui quando, pelo cadastro, parece socorro (não voltou sozinho, foi rebocado, houve substituição ou a Manutenção foi ao local) e a Manutenção ainda não fez o lançamento. Sai sozinha quando a Manutenção lança ou conclui que não foi socorro. Ao cobrar, a mensagem fica na conversa e no histórico da ocorrência.</p></div>
-    ${lista.length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>Protocolo</th><th>Veículo</th><th>Motivo</th><th>Pendente há</th><th>Cobranças</th><th>Status</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>`
+    <div class="pad hint-box">${ic('info', 18)}<p>Esta é a mesma lista da aba <b>“Cobrança Manutenção”</b> da planilha. A ocorrência entra aqui quando, pelo cadastro, parece socorro (não voltou sozinho, foi rebocado, houve substituição ou a Manutenção foi ao local) e a Manutenção ainda não fez o lançamento. Sai sozinha quando a Manutenção lança ou conclui que não foi socorro. Use a lista para cobrar; abra a ocorrência para falar com a Manutenção na conversa.</p></div>
+    ${lista.length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>Protocolo</th><th>Veículo</th><th>Impediu garagem?</th><th>Motivo</th><th>Pendente há</th><th>Status</th></tr></thead><tbody>${linhas}</tbody></table></div>`
       : `<div class="empty"><span>${ic('circle-check', 32)}</span>Nada para cobrar. Tudo que parece socorro já foi lançado.</div>`}</section>`;
 }
 
@@ -1280,10 +1279,8 @@ function actionBox(o) {
   }
   if (p === 'qualidade') {
     const pronto = o.status === 'aguardando_qualidade', sim = o.manut_socorro === 'sim';
-    const sec = `<div class="actions two"><button class="btn btn-ghost-w" data-action="qaDevolverOpen" ${busy || !o.manut_socorro ? 'disabled' : ''}>${ic('undo-2', 18)} Devolver à Manutenção</button><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção ao Transportes</button></div>`;
-    if (o.cobravel) return actBox('Você acompanha: falta a Manutenção', `Pelo cadastro <b>parece socorro</b> e a Manutenção ${o.manut_socorro ? 'ainda não fez o lançamento no Fluig' : 'ainda não respondeu nem lançou'}. Você pode cobrar.`,
-      `<label class="lbl-w" for="cob-msg">Mensagem da cobrança <em>(opcional)</em></label><textarea id="cob-msg" class="inp-w area" data-qa="cob_msg" rows="2" placeholder="Ex.: Favor lançar até o fim do turno.">${esc(d.cob_msg)}</textarea>
-       <button class="btn btn-white btn-block" data-action="qaCobrar" ${busy ? 'disabled' : ''}>${spin}${ic('triangle-alert', 18)} Cobrar a Manutenção</button>${sec}`);
+    const sec = `<div class="actions"><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção ao Transportes</button></div>`;
+    if (o.cobravel) return actBox('Você acompanha: falta a Manutenção', `Pelo cadastro <b>parece socorro</b> e a Manutenção ${o.manut_socorro ? 'ainda não fez o lançamento no Fluig' : 'ainda não respondeu nem lançou'}. Ela está na lista de cobrança (tela <b>Cobrança</b> e aba <b>“Cobrança Manutenção”</b> da planilha). Use a conversa abaixo para falar com a Manutenção.`, sec);
     if (!pronto) return actBox('Você acompanha esta ocorrência', o.status === 'aguardando_manutencao' ? 'A Manutenção ainda vai verificar se foi socorro. Não parece socorro pelo cadastro, então não há cobrança.' : 'Aguardando a Manutenção.', sec);
     return actBox('Sua etapa: finalizar a ocorrência', sim ? 'A Manutenção confirmou o socorro e fez o lançamento. Coloque o nº do Fluig e finalize.' : 'A Manutenção concluiu que não foi socorro. Basta finalizar.',
       `${sim ? `<label class="lbl-w" for="fin-num">Nº do Fluig</label><input id="fin-num" class="inp-w" data-qa="fin_num" value="${esc(d.fin_num == null ? (o.manut_fluig || '') : d.fin_num)}" placeholder="Ex.: 458721" autocomplete="off">` : ''}

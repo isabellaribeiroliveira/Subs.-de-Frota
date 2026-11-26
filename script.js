@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 const CFG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbztWDsUx4oOjptO4T68NvJKezWhj9hmURIRJcN3nouE7iJuZiS11YpNY0489uTX8V13/exec',
+  API_URL: '',
   REFRESH_MS: 45000,     // atualização automática dos dados (ms)
   MAX_ANEXO_MB: 6,       // tamanho máximo de cada anexo
   MAX_ANEXOS: 5          // anexos por ocorrência
@@ -73,13 +73,15 @@ const STATUS = {
 };
 const CONCLUIDAS = ['encerrada'];
 const EM_ANDAMENTO = ['aguardando_manutencao', 'aguardando_lancamento', 'aguardando_qualidade'];
-const EQUIPES = ['transportes', 'manutencao', 'qualidade'];   // quem participa da conversa
+const EQUIPES = ['transportes', 'manutencao', 'qualidade'];   // quem participa da conversa (o motorista não)
 const PAINEL = ['manutencao', 'qualidade'];                    // quem usa o painel; o Transportes usa o app de cadastro
 const ROLE_LABEL = { transportes: 'Transportes', manutencao: 'Manutenção', qualidade: 'Qualidade' };
-function stageLabel(o) { return (STATUS[o.status] || {}).qa || o.status; }
+// aguardando_manutencao/lançamento + e-mail de cobrança enviado = a Qualidade aguarda o retorno
+function aguardaRetorno(o) { return Number(o.cobrancas || 0) > 0 && (o.status === 'aguardando_manutencao' || o.status === 'aguardando_lancamento'); }
+function stageLabel(o) { return aguardaRetorno(o) ? 'Aguardando retorno (e-mail enviado)' : ((STATUS[o.status] || {}).qa || o.status); }
 
 /* Ícones Lucide (ISC License) — https://lucide.dev */
-const ICONS = {"house":"<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\" /><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\" />","plus":"<path d=\"M5 12h14\" /><path d=\"M12 5v14\" />","clipboard-list":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\" /><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\" /><path d=\"M12 11h4\" /><path d=\"M12 16h4\" /><path d=\"M8 11h.01\" /><path d=\"M8 16h.01\" />","layout-dashboard":"<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\" />","hourglass":"<path d=\"M5 22h14\" /><path d=\"M5 2h14\" /><path d=\"M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22\" /><path d=\"M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2\" />","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\" /><path d=\"M3 3v5h5\" /><path d=\"M12 7v5l4 2\" />","chart-column":"<path d=\"M3 3v16a2 2 0 0 0 2 2h16\" /><path d=\"M18 17V9\" /><path d=\"M13 17V5\" /><path d=\"M8 17v-3\" />","log-out":"<path d=\"m16 17 5-5-5-5\" /><path d=\"M21 12H9\" /><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\" />","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\" /><path d=\"M21 3v5h-5\" /><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\" /><path d=\"M8 16H3v5\" />","search":"<path d=\"m21 21-4.34-4.34\" /><circle cx=\"11\" cy=\"11\" r=\"8\" />","sliders-horizontal":"<path d=\"M10 5H3\" /><path d=\"M12 19H3\" /><path d=\"M14 3v4\" /><path d=\"M16 17v4\" /><path d=\"M21 12h-9\" /><path d=\"M21 19h-5\" /><path d=\"M21 5h-7\" /><path d=\"M8 10v4\" /><path d=\"M8 12H3\" />","download":"<path d=\"M12 15V3\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" /><path d=\"m7 10 5 5 5-5\" />","x":"<path d=\"M18 6 6 18\" /><path d=\"m6 6 12 12\" />","chevron-left":"<path d=\"m15 18-6-6 6-6\" />","chevron-right":"<path d=\"m9 18 6-6-6-6\" />","check":"<path d=\"M20 6 9 17l-5-5\" />","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\" /><circle cx=\"12\" cy=\"12\" r=\"3\" />","eye-off":"<path d=\"M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49\" /><path d=\"M14.084 14.158a3 3 0 0 1-4.242-4.242\" /><path d=\"M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143\" /><path d=\"m2 2 20 20\" />","paperclip":"<path d=\"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551\" />","camera":"<path d=\"M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z\" /><circle cx=\"12\" cy=\"13\" r=\"3\" />","file-text":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"M10 9H8\" /><path d=\"M16 13H8\" /><path d=\"M16 17H8\" />","image":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\" /><circle cx=\"9\" cy=\"9\" r=\"2\" /><path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\" />","triangle-alert":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /><path d=\"M12 9v4\" /><path d=\"M12 17h.01\" />","info":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 16v-4\" /><path d=\"M12 8h.01\" />","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\" /><path d=\"m21.854 2.147-10.94 10.939\" />","user":"<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\" /><circle cx=\"12\" cy=\"7\" r=\"4\" />","lock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\" /><path d=\"M7 11V7a5 5 0 0 1 10 0v4\" />","key-round":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","cloud-off":"<path d=\"M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057\" /><path d=\"M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78\" /><path d=\"m2 2 20 20\" />","upload":"<path d=\"M12 3v12\" /><path d=\"m17 8-5-5-5 5\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" />","bus":"<path d=\"M8 6v6\" /><path d=\"M15 6v6\" /><path d=\"M2 12h19.6\" /><path d=\"M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3\" /><circle cx=\"7\" cy=\"18\" r=\"2\" /><path d=\"M9 18h5\" /><circle cx=\"16\" cy=\"18\" r=\"2\" />","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z\" />","zap":"<path d=\"M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z\" />","circle-dot":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"12\" cy=\"12\" r=\"10\" />","snowflake":"<path d=\"m10 20-1.25-2.5L6 18\" /><path d=\"M10 4 8.75 6.5 6 6\" /><path d=\"m14 20 1.25-2.5L18 18\" /><path d=\"m14 4 1.25 2.5L18 6\" /><path d=\"m17 21-3-6h-4\" /><path d=\"m17 3-3 6 1.5 3\" /><path d=\"M2 12h6.5L10 9\" /><path d=\"m20 10-1.5 2 1.5 2\" /><path d=\"M22 12h-6.5L14 15\" /><path d=\"m4 10 1.5 2L4 14\" /><path d=\"m7 21 3-6-1.5-3\" /><path d=\"m7 3 3 6h4\" />","fuel":"<path d=\"M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0v-6.998a2 2 0 0 0-.59-1.42L18 5\" /><path d=\"M14 21V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v16\" /><path d=\"M2 21h13\" /><path d=\"M3 9h11\" />","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\" /><line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\" /><line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\" />","circle-plus":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M8 12h8\" /><path d=\"M12 8v8\" />","cog":"<path d=\"M11 10.27 7 3.34\" /><path d=\"m11 13.73-4 6.93\" /><path d=\"M12 22v-2\" /><path d=\"M12 2v2\" /><path d=\"M14 12h8\" /><path d=\"m17 20.66-1-1.73\" /><path d=\"m17 3.34-1 1.73\" /><path d=\"M2 12h2\" /><path d=\"m20.66 17-1.73-1\" /><path d=\"m20.66 7-1.73 1\" /><path d=\"m3.34 17 1.73-1\" /><path d=\"m3.34 7 1.73 1\" /><circle cx=\"12\" cy=\"12\" r=\"2\" /><circle cx=\"12\" cy=\"12\" r=\"8\" />","map-pin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\" /><circle cx=\"12\" cy=\"10\" r=\"3\" />","calendar":"<path d=\"M8 2v3\" /><path d=\"M16 2v3\" /><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" /><path d=\"M3 9h18\" />","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 6v6l4 2\" />","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\" /><path d=\"M16 3.128a4 4 0 0 1 0 7.744\" /><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\" /><circle cx=\"9\" cy=\"7\" r=\"4\" />","repeat":"<path d=\"m17 2 4 4-4 4\" /><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\" /><path d=\"m7 22-4-4 4-4\" /><path d=\"M21 13v1a4 4 0 0 1-4 4H3\" />","truck":"<path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\" /><path d=\"M15 18H9\" /><path d=\"M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14\" /><circle cx=\"17\" cy=\"18\" r=\"2\" /><circle cx=\"7\" cy=\"18\" r=\"2\" />","circle-check":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m16 9-5.5 5.5L8 12\" />","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\" /><path d=\"m15 5 4 4\" />","archive":"<rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" /><path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" /><path d=\"M10 12h4\" />","badge-check":"<path d=\"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z\" /><path d=\"m16 9-5.5 5.5L8 12\" />","shield-check":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /><path d=\"m9 12 2 2 4-4\" />","id-card":"<path d=\"M13 19a4 4 0 00-8 0\" /><path d=\"M16 10h2\" /><path d=\"M16 14h2\" /><circle cx=\"9\" cy=\"12\" r=\"3\" /><rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\" />","route":"<circle cx=\"6\" cy=\"19\" r=\"3\" /><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\" /><circle cx=\"18\" cy=\"5\" r=\"3\" />","circle-help":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\" /><path d=\"M12 17h.01\" />","sparkles":"<path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /><path d=\"M20 2v4\" /><path d=\"M22 4h-4\" /><circle cx=\"4\" cy=\"20\" r=\"2\" />","car-front":"<path d=\"m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8\" /><path d=\"M7 14h.01\" /><path d=\"M17 14h.01\" /><rect width=\"18\" height=\"8\" x=\"3\" y=\"10\" rx=\"2\" /><path d=\"M5 18v2\" /><path d=\"M19 18v2\" />","ellipsis":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"19\" cy=\"12\" r=\"1\" /><circle cx=\"5\" cy=\"12\" r=\"1\" />","arrow-right":"<path d=\"M5 12h14\" /><path d=\"m12 5 7 7-7 7\" />","circle-x":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m15 9-6 6\" /><path d=\"m9 9 6 6\" />","file-check":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"m9 15 2 2 4-4\" />","timer":"<line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\" /><line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\" /><circle cx=\"12\" cy=\"14\" r=\"8\" />","party-popper":"<path d=\"M5.8 11.3 2 22l10.7-3.79\" /><path d=\"M4 3h.01\" /><path d=\"M22 8h.01\" /><path d=\"M15 2h.01\" /><path d=\"M22 20h.01\" /><path d=\"m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10\" /><path d=\"m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17\" /><path d=\"m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7\" /><path d=\"M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z\" />","inbox":"<polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\" /><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\" />","trash-2":"<path d=\"M10 11v6\" /><path d=\"M14 11v6\" /><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /><path d=\"M3 6h18\" /><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" />","chevron-down":"<path d=\"m6 9 6 6 6-6\" />","database":"<ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /><path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /><path d=\"M3 12A9 3 0 0 0 21 12\" />","list-plus":"<path d=\"M16 5H3\" /><path d=\"M11 12H3\" /><path d=\"M16 19H3\" /><path d=\"M18 9v6\" /><path d=\"M21 12h-6\" />","undo-2":"<path d=\"M9 14 4 9l5-5\" /><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\" />","circle":"<circle cx=\"12\" cy=\"12\" r=\"10\" />"};
+const ICONS = {"house":"<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\" /><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\" />","plus":"<path d=\"M5 12h14\" /><path d=\"M12 5v14\" />","clipboard-list":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\" /><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\" /><path d=\"M12 11h4\" /><path d=\"M12 16h4\" /><path d=\"M8 11h.01\" /><path d=\"M8 16h.01\" />","layout-dashboard":"<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\" /><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\" /><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\" />","hourglass":"<path d=\"M5 22h14\" /><path d=\"M5 2h14\" /><path d=\"M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22\" /><path d=\"M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2\" />","history":"<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\" /><path d=\"M3 3v5h5\" /><path d=\"M12 7v5l4 2\" />","chart-column":"<path d=\"M3 3v16a2 2 0 0 0 2 2h16\" /><path d=\"M18 17V9\" /><path d=\"M13 17V5\" /><path d=\"M8 17v-3\" />","log-out":"<path d=\"m16 17 5-5-5-5\" /><path d=\"M21 12H9\" /><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\" />","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\" /><path d=\"M21 3v5h-5\" /><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\" /><path d=\"M8 16H3v5\" />","search":"<path d=\"m21 21-4.34-4.34\" /><circle cx=\"11\" cy=\"11\" r=\"8\" />","sliders-horizontal":"<path d=\"M10 5H3\" /><path d=\"M12 19H3\" /><path d=\"M14 3v4\" /><path d=\"M16 17v4\" /><path d=\"M21 12h-9\" /><path d=\"M21 19h-5\" /><path d=\"M21 5h-7\" /><path d=\"M8 10v4\" /><path d=\"M8 12H3\" />","download":"<path d=\"M12 15V3\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" /><path d=\"m7 10 5 5 5-5\" />","x":"<path d=\"M18 6 6 18\" /><path d=\"m6 6 12 12\" />","chevron-left":"<path d=\"m15 18-6-6 6-6\" />","chevron-right":"<path d=\"m9 18 6-6-6-6\" />","check":"<path d=\"M20 6 9 17l-5-5\" />","eye":"<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\" /><circle cx=\"12\" cy=\"12\" r=\"3\" />","eye-off":"<path d=\"M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49\" /><path d=\"M14.084 14.158a3 3 0 0 1-4.242-4.242\" /><path d=\"M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143\" /><path d=\"m2 2 20 20\" />","paperclip":"<path d=\"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551\" />","camera":"<path d=\"M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z\" /><circle cx=\"12\" cy=\"13\" r=\"3\" />","file-text":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"M10 9H8\" /><path d=\"M16 13H8\" /><path d=\"M16 17H8\" />","image":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\" /><circle cx=\"9\" cy=\"9\" r=\"2\" /><path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\" />","triangle-alert":"<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /><path d=\"M12 9v4\" /><path d=\"M12 17h.01\" />","info":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 16v-4\" /><path d=\"M12 8h.01\" />","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\" /><path d=\"m21.854 2.147-10.94 10.939\" />","user":"<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\" /><circle cx=\"12\" cy=\"7\" r=\"4\" />","lock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\" /><path d=\"M7 11V7a5 5 0 0 1 10 0v4\" />","key-round":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","cloud-off":"<path d=\"M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057\" /><path d=\"M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78\" /><path d=\"m2 2 20 20\" />","upload":"<path d=\"M12 3v12\" /><path d=\"m17 8-5-5-5 5\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" />","bus":"<path d=\"M8 6v6\" /><path d=\"M15 6v6\" /><path d=\"M2 12h19.6\" /><path d=\"M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3\" /><circle cx=\"7\" cy=\"18\" r=\"2\" /><path d=\"M9 18h5\" /><circle cx=\"16\" cy=\"18\" r=\"2\" />","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z\" />","zap":"<path d=\"M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z\" />","circle-dot":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"12\" cy=\"12\" r=\"10\" />","snowflake":"<path d=\"m10 20-1.25-2.5L6 18\" /><path d=\"M10 4 8.75 6.5 6 6\" /><path d=\"m14 20 1.25-2.5L18 18\" /><path d=\"m14 4 1.25 2.5L18 6\" /><path d=\"m17 21-3-6h-4\" /><path d=\"m17 3-3 6 1.5 3\" /><path d=\"M2 12h6.5L10 9\" /><path d=\"m20 10-1.5 2 1.5 2\" /><path d=\"M22 12h-6.5L14 15\" /><path d=\"m4 10 1.5 2L4 14\" /><path d=\"m7 21 3-6-1.5-3\" /><path d=\"m7 3 3 6h4\" />","fuel":"<path d=\"M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0v-6.998a2 2 0 0 0-.59-1.42L18 5\" /><path d=\"M14 21V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v16\" /><path d=\"M2 21h13\" /><path d=\"M3 9h11\" />","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\" /><line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\" /><line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\" />","circle-plus":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M8 12h8\" /><path d=\"M12 8v8\" />","cog":"<path d=\"M11 10.27 7 3.34\" /><path d=\"m11 13.73-4 6.93\" /><path d=\"M12 22v-2\" /><path d=\"M12 2v2\" /><path d=\"M14 12h8\" /><path d=\"m17 20.66-1-1.73\" /><path d=\"m17 3.34-1 1.73\" /><path d=\"M2 12h2\" /><path d=\"m20.66 17-1.73-1\" /><path d=\"m20.66 7-1.73 1\" /><path d=\"m3.34 17 1.73-1\" /><path d=\"m3.34 7 1.73 1\" /><circle cx=\"12\" cy=\"12\" r=\"2\" /><circle cx=\"12\" cy=\"12\" r=\"8\" />","map-pin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\" /><circle cx=\"12\" cy=\"10\" r=\"3\" />","calendar":"<path d=\"M8 2v3\" /><path d=\"M16 2v3\" /><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" /><path d=\"M3 9h18\" />","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 6v6l4 2\" />","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\" /><path d=\"M16 3.128a4 4 0 0 1 0 7.744\" /><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\" /><circle cx=\"9\" cy=\"7\" r=\"4\" />","repeat":"<path d=\"m17 2 4 4-4 4\" /><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\" /><path d=\"m7 22-4-4 4-4\" /><path d=\"M21 13v1a4 4 0 0 1-4 4H3\" />","truck":"<path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\" /><path d=\"M15 18H9\" /><path d=\"M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14\" /><circle cx=\"17\" cy=\"18\" r=\"2\" /><circle cx=\"7\" cy=\"18\" r=\"2\" />","circle-check":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m16 9-5.5 5.5L8 12\" />","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\" /><path d=\"m15 5 4 4\" />","archive":"<rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" /><path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" /><path d=\"M10 12h4\" />","badge-check":"<path d=\"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z\" /><path d=\"m16 9-5.5 5.5L8 12\" />","shield-check":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /><path d=\"m9 12 2 2 4-4\" />","id-card":"<path d=\"M13 19a4 4 0 00-8 0\" /><path d=\"M16 10h2\" /><path d=\"M16 14h2\" /><circle cx=\"9\" cy=\"12\" r=\"3\" /><rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\" />","route":"<circle cx=\"6\" cy=\"19\" r=\"3\" /><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\" /><circle cx=\"18\" cy=\"5\" r=\"3\" />","circle-help":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\" /><path d=\"M12 17h.01\" />","sparkles":"<path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\" /><path d=\"M20 2v4\" /><path d=\"M22 4h-4\" /><circle cx=\"4\" cy=\"20\" r=\"2\" />","car-front":"<path d=\"m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8\" /><path d=\"M7 14h.01\" /><path d=\"M17 14h.01\" /><rect width=\"18\" height=\"8\" x=\"3\" y=\"10\" rx=\"2\" /><path d=\"M5 18v2\" /><path d=\"M19 18v2\" />","ellipsis":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"19\" cy=\"12\" r=\"1\" /><circle cx=\"5\" cy=\"12\" r=\"1\" />","arrow-right":"<path d=\"M5 12h14\" /><path d=\"m12 5 7 7-7 7\" />","circle-x":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m15 9-6 6\" /><path d=\"m9 9 6 6\" />","file-check":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"m9 15 2 2 4-4\" />","timer":"<line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\" /><line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\" /><circle cx=\"12\" cy=\"14\" r=\"8\" />","party-popper":"<path d=\"M5.8 11.3 2 22l10.7-3.79\" /><path d=\"M4 3h.01\" /><path d=\"M22 8h.01\" /><path d=\"M15 2h.01\" /><path d=\"M22 20h.01\" /><path d=\"m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10\" /><path d=\"m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17\" /><path d=\"m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7\" /><path d=\"M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z\" />","inbox":"<polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\" /><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\" />","trash-2":"<path d=\"M10 11v6\" /><path d=\"M14 11v6\" /><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /><path d=\"M3 6h18\" /><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" />","chevron-down":"<path d=\"m6 9 6 6 6-6\" />","database":"<ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\" /><path d=\"M3 5V19A9 3 0 0 0 21 19V5\" /><path d=\"M3 12A9 3 0 0 0 21 12\" />","list-plus":"<path d=\"M16 5H3\" /><path d=\"M11 12H3\" /><path d=\"M16 19H3\" /><path d=\"M18 9v6\" /><path d=\"M21 12h-6\" />","undo-2":"<path d=\"M9 14 4 9l5-5\" /><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\" />","circle":"<circle cx=\"12\" cy=\"12\" r=\"10\" />","mail":"<path d=\"m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7\" /><rect x=\"2\" y=\"4\" width=\"20\" height=\"16\" rx=\"2\" />"};
 function ic(name, size, cls) {
   const s = size || 20;
   return `<svg class="ic${cls ? ' ' + cls : ''}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -97,8 +99,8 @@ const state = {
   picker: null, loadingData: false, outbox: [], draftInfo: null, loginError: '', loginBusy: false, passError: '', passBusy: false, busy: false,
   qa: {
     view: 'dashboard', detail: null, showFilters: false, limit: 100,
-    f: { q: '', from: '', to: '', status: '', setor: '', linha: '', motivo: '', impacto: '', subst: '' },
-    cad: { tab: 'veiculos', q: '', draft: '' },
+    f: { q: '', from: '', to: '', status: '', setor: '', linha: '', motivo: '', impacto: '', subst: '', filial: '' },
+    cad: { tab: 'veiculos', q: '', draft: '' }, cobOff: {},
     rel: { from: '', to: '' }, drafts: { socorro: '', obs: '', correcao: '' }, draftFor: null
   }
 };
@@ -180,7 +182,7 @@ const FLOW = [
   { id: 'passageiros', sec: 'Impacto', type: 'yn', k: 'possui_passageiros', title: 'Havia passageiros no interior do veículo no momento da falha?' },
   { id: 'baldeio', sec: 'Impacto', type: 'yn', k: 'houve_baldeio', title: 'Houve necessidade de baldeio?',
     sub: 'Baldeio é a transferência dos passageiros para outro veículo.', when: d => d.possui_passageiros === 'sim' },
-  { id: 'horario', sec: 'Impacto', type: 'yn', k: 'houve_impacto_horario', title: 'A ocorrência causou atraso ou impediu o cumprimento do horário programado?' },
+  { id: 'horario', sec: 'Impacto', type: 'yn', k: 'houve_impacto_horario', title: 'A ocorrência ocasionou atraso ou impossibilitou o cumprimento do horário programado?' },
   { id: 'tipo_impacto', sec: 'Impacto', type: 'choice', k: 'tipo_impacto', title: 'Qual foi o impacto?', options: TIPOS_IMPACTO, when: d => d.houve_impacto_horario === 'sim' },
   { id: 'desc_impacto', sec: 'Impacto', type: 'fields', title: 'Descreva o impacto', when: d => d.tipo_impacto === 'Outro',
     fields: [{ k: 'descricao_impacto', label: 'O que aconteceu?', kind: 'area', ph: 'Descreva aqui' }] },
@@ -199,7 +201,7 @@ const FLOW = [
   { id: 'manut', sec: 'Manutenção', type: 'yn', k: 'manutencao_acionada', title: 'A equipe de Manutenção foi acionada para atendimento no local da ocorrência?' },
   { id: 'manut_desloc', sec: 'Manutenção', type: 'yn', k: 'manutencao_deslocou', title: 'Houve deslocamento da equipe até o veículo?', when: d => d.manutencao_acionada === 'sim' },
 
-  { id: 'retorno', sec: 'Retorno', type: 'yn', k: 'retorno_proprio', title: 'O veículo conseguiu retornar por meios próprios?' },
+  { id: 'retorno', sec: 'Retorno', type: 'yn', k: 'retorno_proprio', title: 'O veículo conseguiu retornar por meios próprios?', sub: 'Pergunta padrão: o veículo conseguiu retornar por meios próprios ou foi necessária remoção/reboque?' },
   { id: 'remocao', sec: 'Retorno', type: 'yn', k: 'houve_remocao', title: 'Foi necessária remoção/reboque?', when: d => d.retorno_proprio === 'nao' },
   { id: 'tipo_remocao', sec: 'Retorno', type: 'choice', k: 'tipo_remocao', title: 'Qual o tipo de remoção?', options: TIPOS_REMOCAO, when: d => d.houve_remocao === 'sim' },
 
@@ -307,7 +309,7 @@ function setAnswer(k, v, auto) {
 
 /* ------------------------- Seções (revisão e detalhe) ------------------------- */
 function sections(o) {
-  const rows = (arr) => arr.filter(r => r[1] !== '' && r[1] !== undefined && r[1] !== null);
+  const rows = (arr) => arr.filter(r => r[1] !== '' && r[1] !== '—' && r[1] !== undefined && r[1] !== null);
   const local = [o.cidade, o.bairro, o.local_especifico].filter(Boolean).join(' · ');
   const out = [
     { t: 'Identificação', step: 'veic_mot', rows: rows([['Veículo', o.veiculo], ['Motorista', o.motorista], ['Setor', o.setor], ['Linha', o.linha],
@@ -406,7 +408,7 @@ function cside(active) {
   return `<aside class="qa-side cside"><div class="qa-brand">${LOGO}</div>
     <button class="btn btn-primary btn-block cside-cta" data-action="novaOcorrencia">${ic('plus', 20)} Nova ocorrência</button>
     <nav>${item('home', 'house', 'Início', 'goHome')}${item('minhas', 'clipboard-list', 'Minhas ocorrências', 'goMinhas')}</nav>
-    <div class="qa-user"><span class="avatar-sm">${esc(initials(state.user.nome))}</span><div><b>${esc(state.user.nome)}</b><small>Matrícula ${esc(state.user.matricula)}</small></div>
+    <div class="qa-user"><span class="avatar-sm">${esc(initials(state.user.nome))}</span><div><b>${esc(state.user.nome)}</b><small>${state.user.filial ? 'Filial ' + esc(state.user.filial) : 'Matrícula ' + esc(state.user.matricula)}</small></div>
     <button class="icon-btn" data-action="logout" title="Sair" aria-label="Sair">${ic('log-out', 16)}</button></div></aside>`;
 }
 function tabbar(active) {
@@ -451,7 +453,7 @@ function renderHome() {
         <section class="hero card">${SWOOSH}
           <p class="eyebrow">Olá, ${esc(state.user.nome.split(' ')[0])}</p>
           <h1>Aconteceu algo com um veículo?</h1>
-          <p class="muted">Registre em poucos toques. Só perguntamos o que é necessário.</p>
+          <p class="muted">Registre o ocorrido em poucos toques. Só perguntamos o que é necessário.</p>
           <button class="btn btn-primary btn-lg" data-action="novaOcorrencia">${ic('plus', 22)} Nova ocorrência</button>
         </section>
         <section class="tiles">
@@ -509,8 +511,8 @@ function wizSteps(vis, idx) {       // estado de cada seção: concluída / atua
   return SECOES.map(sec => {
     const ids = vis.map((s, i) => s.sec === sec.n ? i : -1).filter(i => i >= 0);
     const first = ids[0], last = ids[ids.length - 1];
-    return Object.assign({}, sec, { st: idx > last ? 'done' : idx >= first ? 'cur' : 'todo' });
-  });
+    return Object.assign({}, sec, { vazia: !ids.length, st: idx > last ? 'done' : idx >= first ? 'cur' : 'todo' });
+  }).filter(x => !x.vazia);   // o motorista não passa por todas as seções
 }
 function renderWizard() {
   const w = state.wiz; const vis = visibleFlow(w.data);
@@ -1020,7 +1022,7 @@ function qaNavItems() {
 }
 function inQueue(o, p) {
   if (p === 'manutencao') return o.status === 'aguardando_manutencao' || o.status === 'aguardando_lancamento';
-  if (p === 'qualidade') return o.status === 'aguardando_qualidade';
+  if (p === 'qualidade') return !!o.pode_finalizar;   // pronto para o veredito (resposta da Manutenção ou e-mail já enviado)
   if (p === 'transportes') return o.status === 'correcao_solicitada';
   return false;
 }
@@ -1028,7 +1030,7 @@ function oldestFirst(list) { return list.slice().sort((a, b) => String(a.criado_
 function myQueue() { return oldestFirst(state.occs.filter(o => inQueue(o, perfil()))); }
 const QA_TITLES = { dashboard: 'Dashboard', ocorrencias: 'Ocorrências', pendencias: 'Minha fila', cobranca: 'Cobrança da Manutenção', historico: 'Histórico', relatorios: 'Relatórios', cadastros: 'Cadastros' };
 
-function qaEmptyFilters() { return { q: '', from: '', to: '', status: '', setor: '', linha: '', motivo: '', impacto: '', subst: '' }; }
+function qaEmptyFilters() { return { q: '', from: '', to: '', status: '', setor: '', linha: '', motivo: '', impacto: '', subst: '', filial: '' }; }
 
 /* ------------------------- Filtros ------------------------- */
 function qaFilter(list, f) {
@@ -1042,6 +1044,7 @@ function qaFilter(list, f) {
     if (f.to && o.data > f.to) return false;
     if (f.status === 'concluidas') { if (!CONCLUIDAS.includes(o.status)) return false; }
     else if (f.status && o.status !== f.status) return false;
+    if (f.filial && o.filial !== f.filial) return false;
     if (f.setor && o.setor !== f.setor) return false;
     if (f.linha && o.linha !== f.linha) return false;
     if (f.motivo && o.motivo !== f.motivo) return false;
@@ -1057,17 +1060,21 @@ function uniqueSorted(arr) { return Array.from(new Set(arr.filter(Boolean))).sor
 function qaTable(list, opts) {
   opts = opts || {};
   if (!list.length) return `<div class="empty"><span>${ic('inbox', 32)}</span>${opts.empty || 'Nenhuma ocorrência encontrada.'}</div>`;
-  const cp = opts.compact ? ' class="cp"' : '';
-  const rows = list.map(o => `<tr tabindex="0" role="button" data-action="qaOpen" data-id="${esc(o.protocolo)}">
-    <td data-l="Protocolo"><b class="mono">${esc(o.protocolo)}</b></td>
-    <td data-l="Quando">${fmtDate(o.data)} <small>${esc(o.hora)}</small></td>
-    <td data-l="Veículo">${esc(o.veiculo)}</td>
-    <td data-l="Setor · Linha">${esc(o.setor)}<small>${esc(o.linha)}</small></td>
-    <td data-l="Motivo"><span class="mi">${motivoIcon(o.motivo, 16)}</span> ${esc(o.motivo)}</td>
-    <td data-l="Nº Fluig" class="mono${o.numero_socorro ? '' : ' nosoc'}">${o.numero_socorro ? esc(o.numero_socorro) : '<span class="dash">—</span>'}</td>
-    <td data-l="Há"><span class="age ${(inQueue(o, perfil()) && Date.now() - new Date(o.criado_em) > 3600000) ? 'late' : ''}">${ago(o.criado_em)}</span></td>
-    <td data-l="Status">${pill(o.status, true, o)}</td></tr>`).join('');
-  return `<div class="table-wrap"><table class="tbl${opts.compact ? ' compact' : ''}"><thead><tr><th>Protocolo</th><th>Quando</th><th>Veículo</th><th>Setor · Linha</th><th>Motivo</th><th>Nº Fluig</th><th>Há</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const qual = perfil() === 'qualidade';
+  // colunas: [rótulo, mostrar?, célula]  (a versão compacta, usada no dashboard, mostra menos)
+  const cols = [
+    ['Protocolo', true, o => `<td data-l="Protocolo"><b class="mono">${esc(o.protocolo)}</b></td>`],
+    ['Quando', !opts.compact, o => `<td data-l="Quando">${fmtDate(o.data)} <small>${esc(o.hora)}</small></td>`],
+    ['Veículo', true, o => `<td data-l="Veículo">${esc(o.veiculo)}</td>`],
+    ['Filial', qual, o => `<td data-l="Filial">${esc(o.filial)}</td>`],
+    ['Setor · Linha', !opts.compact, o => `<td data-l="Setor · Linha">${esc(o.setor)}<small>${esc(o.linha)}</small></td>`],
+    ['Motivo', true, o => `<td data-l="Motivo"><span class="mi">${motivoIcon(o.motivo, 16)}</span> ${esc(o.motivo)}</td>`],
+    ['Nº Fluig', !opts.compact, o => `<td data-l="Nº Fluig" class="mono${o.numero_socorro ? '' : ' nosoc'}">${o.numero_socorro ? esc(o.numero_socorro) : '<span class="dash">—</span>'}</td>`],
+    ['Há', true, o => `<td data-l="Há"><span class="age ${(inQueue(o, perfil()) && Date.now() - new Date(o.criado_em) > 3600000) ? 'late' : ''}">${ago(o.criado_em)}</span></td>`],
+    ['Status', true, o => `<td data-l="Status">${pill(o.status, true, o)}</td>`]
+  ].filter(c => c[1]);
+  const rows = list.map(o => `<tr tabindex="0" role="button" data-action="qaOpen" data-id="${esc(o.protocolo)}">${cols.map(c => c[2](o)).join('')}</tr>`).join('');
+  return `<div class="table-wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function bars(items, max) {
   if (!items.length) return '<div class="empty small"><span>—</span>Sem dados no período.</div>';
@@ -1111,17 +1118,32 @@ function qaDashboard() {
 }
 
 /** Cobrança: ocorrências que parecem socorro e a Manutenção ainda não lançou (mesma lista da aba "Cobrança Manutenção"). */
+async function enviarEmailCobranca(protocolos) {
+  if (state.busy) return; state.busy = true; render();
+  const r = await API.call('enviarCobranca', { protocolos });
+  state.busy = false;
+  if (r.ok) {
+    r.data.ocorrencias.forEach(upsertOcc); toast(`E-mail enviado à Manutenção (${r.data.enviados} ocorrência${r.data.enviados > 1 ? 's' : ''}). Aguarde o retorno.`);
+    if ((r.data.semEmail || []).length) setTimeout(() => toast('Sem e-mail de Manutenção cadastrado para a filial: ' + r.data.semEmail.join(', ') + '.', 'error'), 600);
+  }
+  else if (r.code === 'AUTH') return doLogout(r.message);
+  else toast(r.message || 'Não foi possível enviar o e-mail.', 'error');
+  render();
+}
 function qaCobranca() {
-  const lista = cobrancaLista();
+  const lista = cobrancaLista(), off = state.qa.cobOff || {}, marcadas = lista.filter(o => !off[o.protocolo]);
   const linhas = lista.map(o => `<tr tabindex="0" role="button" data-action="qaOpen" data-id="${esc(o.protocolo)}">
-    <td data-l="Protocolo"><b class="mono">${esc(o.protocolo)}</b><small>${fmtDate(o.data)} ${esc(o.hora)}</small></td><td data-l="Veículo">${esc(o.veiculo)}</td>
-    <td data-l="Impediu garagem?">${o.retorno_proprio === 'nao' ? 'Sim' : 'Não'}</td>
+    <td class="chk"><input type="checkbox" aria-label="Incluir ${esc(o.protocolo)} no e-mail" data-action="qaCobToggle" data-id="${esc(o.protocolo)}" ${off[o.protocolo] ? '' : 'checked'}></td>
+    <td data-l="Protocolo"><b class="mono">${esc(o.protocolo)}</b><small>${fmtDate(o.data)} ${esc(o.hora)}</small></td><td data-l="Filial">${esc(o.filial)}</td><td data-l="Veículo">${esc(o.veiculo)}</td>
     <td data-l="Motivo"><span class="mi">${motivoIcon(o.motivo, 16)}</span> ${esc(o.motivo)}</td>
     <td data-l="Pendente"><span class="age ${Date.now() - new Date(o.criado_em) > 4 * 3600000 ? 'late' : ''}">${ago(o.criado_em)}</span></td>
+    <td data-l="E-mail">${Number(o.cobrancas || 0) ? `${o.cobrancas}× · ${ago(o.cobrado_em)}` : '—'}</td>
     <td data-l="Status">${pill(o.status, true, o)}</td></tr>`).join('');
-  return `<section class="panel"><header><h2>Cobrança da Manutenção <small>parece socorro e ainda sem lançamento</small></h2><span class="count ${lista.length ? 'alert' : ''}">${lista.length}</span></header>
-    <div class="pad hint-box">${ic('info', 18)}<p>Esta é a mesma lista da aba <b>“Cobrança Manutenção”</b> da planilha. A ocorrência entra aqui quando, pelo cadastro, parece socorro (não voltou sozinho, foi rebocado, houve substituição ou a Manutenção foi ao local) e a Manutenção ainda não fez o lançamento. Sai sozinha quando a Manutenção lança ou conclui que não foi socorro. Use a lista para cobrar; abra a ocorrência para falar com a Manutenção na conversa.</p></div>
-    ${lista.length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>Protocolo</th><th>Veículo</th><th>Impediu garagem?</th><th>Motivo</th><th>Pendente há</th><th>Status</th></tr></thead><tbody>${linhas}</tbody></table></div>`
+  return `<section class="panel"><header><h2>Cobrança da Manutenção <small>parece socorro e ainda sem lançamento no Fluig</small></h2><span class="count ${lista.length ? 'alert' : ''}">${lista.length}</span></header>
+    <div class="pad hint-box">${ic('info', 18)}<p>Aqui estão os pendentes que <b>parecem socorro</b> (não voltaram sozinhos, foram rebocados, houve substituição ou a Manutenção foi ao local) e que a Manutenção <b>ainda não lançou no Fluig</b>. A lista é a mesma da aba <b>“Cobrança Manutenção”</b> da planilha. O e-mail vai para a <b>Manutenção de cada filial</b>, com as perguntas padrão e as respostas do Transportes. Envie o <b>e-mail de cobrança</b>, aguarde o retorno e depois abra a ocorrência para registrar o <b>veredito final</b> (foi socorro ou não) com o nº do Fluig.</p></div>
+    ${lista.length ? `<div class="toolbar"><span class="muted tiny">${marcadas.length} de ${lista.length} selecionada${marcadas.length === 1 ? '' : 's'} para o e-mail</span><span class="grow"></span>
+        <button class="btn btn-primary" data-action="qaEmailLote" ${state.busy || !marcadas.length ? 'disabled' : ''}>${state.busy ? '<span class="spinner sm"></span>' : ic('mail', 18)} Enviar e-mail de cobrança (${marcadas.length})</button></div>
+      <div class="table-wrap"><table class="tbl"><thead><tr><th class="chk"></th><th>Protocolo</th><th>Filial</th><th>Veículo</th><th>Motivo</th><th>Pendente há</th><th>E-mail enviado</th><th>Status</th></tr></thead><tbody>${linhas}</tbody></table></div>`
       : `<div class="empty"><span>${ic('circle-check', 32)}</span>Nada para cobrar. Tudo que parece socorro já foi lançado.</div>`}</section>`;
 }
 
@@ -1132,7 +1154,7 @@ function qaFiltersPanel() {
   const linhas = uniqueSorted([].concat(state.listas.linhas || [], state.occs.map(o => o.linha)));
   const statusOpts = Object.keys(STATUS).map(k => [k, STATUS[k].qa]);
   return `<div class="filters"><label class="fl"><span>De</span><input type="date" data-filter="from" value="${esc(f.from)}"></label><label class="fl"><span>Até</span><input type="date" data-filter="to" value="${esc(f.to)}"></label>
-    ${sel('status', 'Status', statusOpts)}${sel('setor', 'Setor', setores)}${sel('linha', 'Linha', linhas)}${sel('motivo', 'Motivo', MOTIVOS.map(m => m.v))}
+    ${perfil() === 'qualidade' ? sel('filial', 'Filial', uniqueSorted([].concat(state.listas.filiais || [], state.occs.map(o => o.filial)))) : ''}${sel('status', 'Status', statusOpts)}${sel('setor', 'Setor', setores)}${sel('linha', 'Linha', linhas)}${sel('motivo', 'Motivo', MOTIVOS.map(m => m.v))}
     ${sel('impacto', 'Impacto no horário', [['sim', 'Sim'], ['nao', 'Não']])}${sel('subst', 'Substituição', [['sim', 'Sim'], ['nao', 'Não']])}
     <div class="fl end"><button class="btn btn-ghost btn-sm" data-action="qaClear">Limpar filtros</button></div></div>`;
 }
@@ -1217,7 +1239,7 @@ function renderQualidade() {
   const sync = state.lastSync ? `Atualizado há ${ago(new Date(state.lastSync).toISOString())}` : '';
   return `<div class="qa"><aside class="qa-side"><div class="qa-brand">${LOGO}</div>
       <nav>${qaNavItems().map(n => navBtn(n, 'nav')).join('')}</nav>
-      <div class="qa-user"><span class="avatar-sm">${esc(initials(state.user.nome))}</span><div><b>${esc(state.user.nome)}</b><small>${ROLE_LABEL[state.user.perfil]}</small></div>
+      <div class="qa-user"><span class="avatar-sm">${esc(initials(state.user.nome))}</span><div><b>${esc(state.user.nome)}</b><small>${ROLE_LABEL[state.user.perfil]}${state.user.filial ? ' · ' + esc(state.user.filial) : ''}</small></div>
       <button class="icon-btn" data-action="logout" title="Sair" aria-label="Sair">${ic('log-out', 16)}</button></div></aside>
     <div class="qa-main"><header class="qa-top"><div class="qa-top-l"><span class="qa-mlogo">${LOGO}</span><h1>${QA_TITLES[v]}</h1></div>
       <div class="qa-top-r"><small class="muted sync">${sync}</small><button class="btn btn-ghost btn-sm ${state.syncing ? 'spin' : ''}" data-action="refreshNow">${ic('refresh-cw', 16)} Atualizar</button>
@@ -1243,8 +1265,8 @@ function respostasHtml(o) {
   const lan = o.manut_socorro === 'sim'
     ? (o.manut_lancado === 'sim' ? kvLine('Lançamento no Fluig', `Realizado por ${o.manut_lancado_por} · ${fmtDT(o.manut_lancado_em)}`) : kvLine('Lançamento no Fluig', 'Pendente')) + kvLine('Nº Fluig informado pela Manutenção', o.manut_fluig)
     : '';
-  const cobr = Number(o.cobrancas || 0) ? kvLine('Cobranças da Qualidade', `${o.cobrancas} · última ${fmtDT(o.cobrado_em)}`) : '';
-  const fim = o.status === 'encerrada' ? kvLine('Qualidade', `Finalizada por ${o.responsavel_qualidade} · ${fmtDT(o.data_lancamento_socorro)}`) + kvLine('Nº Fluig final', o.numero_socorro) + kvLine('Observação da Qualidade', o.observacao_qualidade) : '';
+  const cobr = Number(o.cobrancas || 0) ? kvLine('E-mails de cobrança à Manutenção', `${o.cobrancas} · último em ${fmtDT(o.cobrado_em)}`) : '';
+  const fim = o.status === 'encerrada' ? kvLine('Veredito final', o.veredito === 'sim' ? 'Foi socorro' : 'Não foi socorro') + kvLine('Nº Fluig final', o.numero_socorro) + kvLine('Retorno da Manutenção', o.retorno_manutencao) + kvLine('Observação da Qualidade', o.observacao_qualidade) + kvLine('Finalizada por', `${o.responsavel_qualidade} · ${fmtDT(o.data_lancamento_socorro)}`) : '';
   return `<section class="rv"><header><h3>Andamento</h3>${o.parece_socorro ? `<span class="tag">${ic('triangle-alert', 13)} parece socorro</span>` : ''}</header>${man}${lan}${cobr}${fim}</section>`;
 }
 function conversaHtml(o) {
@@ -1259,7 +1281,7 @@ function actBox(titulo, texto, corpo) { return `<section class="act"><h3>${titul
 function actionBox(o) {
   const p = perfil(), d = state.qa.drafts, busy = state.busy;
   const spin = busy ? '<span class="spinner sm"></span>' : '';
-  if (o.status === 'encerrada') return actBox('Ocorrência finalizada', o.manut_socorro === 'sim' ? `Finalizada com o nº Fluig <b>${esc(o.numero_socorro)}</b>.` : 'Finalizada: a Manutenção concluiu que não foi socorro.', '');
+  if (o.status === 'encerrada') return actBox('Ocorrência finalizada', o.veredito === 'sim' ? `Veredito da Qualidade: <b>foi socorro</b> · Fluig <b>${esc(o.numero_socorro)}</b>.` : 'Veredito da Qualidade: <b>não foi socorro</b>.', '');
   if (o.status === 'correcao_solicitada') return actBox('Aguardando o Transportes', `${esc(o.correcao_por || 'Uma equipe')} pediu a correção do cadastro: <b>${esc(o.correcao_mensagem)}</b>`, '');
   if (p === 'manutencao') {
     const sim = d.man_socorro === 'sim', nao = d.man_socorro === 'nao', lanc = d.man_lancado === 'sim';
@@ -1278,20 +1300,25 @@ function actionBox(o) {
       <div class="actions" style="margin-top:12px"><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção ao Transportes</button></div>`);
   }
   if (p === 'qualidade') {
-    const pronto = o.status === 'aguardando_qualidade', sim = o.manut_socorro === 'sim';
-    const sec = `<div class="actions"><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção ao Transportes</button></div>`;
-    if (o.cobravel) return actBox('Você acompanha: falta a Manutenção', `Pelo cadastro <b>parece socorro</b> e a Manutenção ${o.manut_socorro ? 'ainda não fez o lançamento no Fluig' : 'ainda não respondeu nem lançou'}. Ela está na lista de cobrança (tela <b>Cobrança</b> e aba <b>“Cobrança Manutenção”</b> da planilha). Use a conversa abaixo para falar com a Manutenção.`, sec);
-    if (!pronto) return actBox('Você acompanha esta ocorrência', o.status === 'aguardando_manutencao' ? 'A Manutenção ainda vai verificar se foi socorro. Não parece socorro pelo cadastro, então não há cobrança.' : 'Aguardando a Manutenção.', sec);
-    return actBox('Sua etapa: finalizar a ocorrência', sim ? 'A Manutenção confirmou o socorro e fez o lançamento. Coloque o nº do Fluig e finalize.' : 'A Manutenção concluiu que não foi socorro. Basta finalizar.',
-      `${sim ? `<label class="lbl-w" for="fin-num">Nº do Fluig</label><input id="fin-num" class="inp-w" data-qa="fin_num" value="${esc(d.fin_num == null ? (o.manut_fluig || '') : d.fin_num)}" placeholder="Ex.: 458721" autocomplete="off">` : ''}
-      <label class="lbl-w" for="fin-obs">Observação da Qualidade <em>(opcional)</em></label><textarea id="fin-obs" class="inp-w area" data-qa="fin_obs" rows="2" placeholder="Ex.: Conferido no Fluig.">${esc(d.fin_obs)}</textarea>
-      <button class="btn btn-white btn-block" data-action="qaFinalizar" ${busy ? 'disabled' : ''}>${spin}${ic('badge-check', 18)} Finalizar ocorrência</button>${sec}`);
+    const aguardando = aguardaRetorno(o), pronto = !!o.pode_finalizar;
+    const ver = d.fin_ver == null ? (o.manut_socorro || '') : d.fin_ver, sim = ver === 'sim', nao = ver === 'nao';
+    const sec = `<div class="actions"><button class="btn btn-ghost-w" data-action="qaCorrecaoOpen" ${busy ? 'disabled' : ''}>${ic('pencil', 18)} Pedir correção</button></div>`;
+    const email = o.cobravel ? `<div class="sub-act"><b>${ic('mail', 16)} ${aguardando ? 'E-mail já enviado à Manutenção' : 'Parece socorro e não foi lançado no Fluig'}</b>
+        <p>${aguardando ? `Enviado ${Number(o.cobrancas)}× (último envio ${ago(o.cobrado_em) === 'agora' ? 'agora' : 'há ' + ago(o.cobrado_em)}). Aguarde o retorno e registre o veredito abaixo.` : 'Envie o e-mail de cobrança à Manutenção e aguarde o retorno. Depois você registra o veredito final.'}</p>
+        <button class="btn btn-white btn-block" data-action="qaEmailUm" ${busy ? 'disabled' : ''}>${spin}${ic('mail', 18)} ${aguardando ? 'Enviar novo e-mail de cobrança' : 'Enviar e-mail de cobrança'}</button></div>` : '';
+    if (!pronto) return actBox('Você acompanha esta ocorrência', o.status === 'aguardando_manutencao' ? 'A Manutenção ainda vai verificar se foi socorro.' : 'Aguardando a Manutenção.', email + sec);
+    return actBox('Sua etapa: veredito final', aguardando ? 'Retorno recebido da Manutenção? Registre se foi socorro ou não e finalize.' : 'A Manutenção já respondeu. Confira e registre o veredito final.',
+      `<div class="duo"><button class="${sim ? 'on' : ''}" data-action="qaFinVer" data-v="sim">${ic('circle-check', 20)} Foi socorro</button><button class="${nao ? 'on' : ''}" data-action="qaFinVer" data-v="nao">${ic('circle-x', 20)} Não foi socorro</button></div>
+      ${sim ? `<label class="lbl-w" for="fin-num">Nº do Fluig</label><input id="fin-num" class="inp-w" data-qa="fin_num" value="${esc(d.fin_num == null ? (o.manut_fluig || '') : d.fin_num)}" placeholder="Ex.: 458721" autocomplete="off">` : ''}
+      ${sim || nao ? `<label class="lbl-w" for="fin-ret">Retorno da Manutenção <em>(resumo da resposta recebida)</em></label><textarea id="fin-ret" class="inp-w area" data-qa="fin_ret" rows="2" placeholder="Ex.: Manutenção respondeu por e-mail: socorro confirmado.">${esc(d.fin_ret == null ? (o.manut_parecer || '') : d.fin_ret)}</textarea>
+      <label class="lbl-w" for="fin-obs">Observação da Qualidade <em>(opcional)</em></label><textarea id="fin-obs" class="inp-w area" data-qa="fin_obs" rows="2" placeholder="Ex.: Conferido no Fluig.">${esc(d.fin_obs)}</textarea>` : ''}
+      <button class="btn btn-white btn-block" data-action="qaFinalizar" ${busy || (!sim && !nao) ? 'disabled' : ''}>${spin}${ic('badge-check', 18)} Registrar veredito e finalizar</button>${email}${sec}`);
   }
   return '';
 }
 function qaDrawer(o) {
   return `<div data-ov="drawer:${o.protocolo}" class="scrim right" data-action="closeOverlay" data-self="1"><aside class="drawer" role="dialog" aria-label="Ocorrência ${esc(o.protocolo)}">
-    <header class="drawer-head"><div><h2>${esc(o.protocolo)}</h2><small class="muted">${fmtDate(o.data)} às ${esc(o.hora)} · cadastrada por ${esc(o.criado_por)} (${esc(o.matricula_criador)})</small></div>
+    <header class="drawer-head"><div><h2>${esc(o.protocolo)}</h2><small class="muted">${fmtDate(o.data)} às ${esc(o.hora)} · aberta por ${esc(o.criado_por)} (${esc(o.matricula_criador)})${o.filial ? ' · Filial ' + esc(o.filial) : ''}</small></div>
       <button class="icon-btn" data-action="closeOverlay" aria-label="Fechar">${ic('x', 20)}</button></header>
     <div class="drawer-body">
       <div class="row-between">${pill(o.status, true, o)}<small class="muted">Cadastrada há ${ago(o.criado_em)}</small></div>
@@ -1327,7 +1354,7 @@ function qaResetDrafts(o) {
   state.qa.draftFor = o.protocolo;
   state.qa.drafts = { msg: '', correcao: '', dev_msg: '', cob_msg: '',
     man_socorro: o.manut_socorro || '', man_lancado: o.manut_lancado || '', man_fluig: o.manut_fluig || '', man_parecer: o.manut_parecer || '',
-    fin_num: null, fin_obs: o.observacao_qualidade || '' };   // fin_num null = ainda não mexeu: usa o nº Fluig informado pela Manutenção
+    fin_ver: null, fin_ret: null, fin_num: null, fin_obs: o.observacao_qualidade || '' };   // fin_num null = ainda não mexeu: usa o nº Fluig informado pela Manutenção
 }
 function qaRefreshResults() {
   const el = document.getElementById('qa-results'); if (el) el.innerHTML = qaResults();
@@ -1368,7 +1395,7 @@ function exportCsv(list, nome) {
     ['manutencao_acionada', 'Manutenção acionada', yn], ['manutencao_deslocou', 'Manutenção deslocou', yn], ['retorno_proprio', 'Retorno próprio', yn],
     ['houve_remocao', 'Remoção', yn], ['tipo_remocao', 'Tipo de remoção'], ['motivo', 'Motivo'], ['descricao_motivo', 'Descrição do motivo'], ['observacoes', 'Observações'],
     ['numero_socorro', 'Nº Fluig'], ['status', 'Status', s => statusLabel(s, true)], ['manut_socorro', 'Manutenção: foi socorro?', yn], ['manut_parecer', 'Manutenção: parecer'], ['manut_por', 'Manutenção: respondido por'],
-    ['manut_lancado', 'Manutenção: lançamento no Fluig?', yn], ['cobrancas', 'Cobranças da Qualidade'], ['responsavel_qualidade', 'Finalizado por (Qualidade)'],
+    ['manut_lancado', 'Manutenção: lançamento no Fluig?', yn], ['cobrancas', 'Cobranças da Qualidade'], ['veredito', 'Veredito final: foi socorro?', yn], ['retorno_manutencao', 'Retorno da Manutenção'], ['filial', 'Filial'], ['responsavel_qualidade', 'Finalizado por (Qualidade)'],
     ['data_lancamento_socorro', 'Finalizado em', fmtDT], ['observacao_qualidade', 'Observação da Qualidade'], ['criado_por', 'Criado por'], ['criado_em', 'Criado em', fmtDT]];
   const head = cols.map(c => csvCell(c[1])).join(';');
   const body = list.map(o => cols.map(c => csvCell(c[2] ? (c[2] === yn && !o[c[0]] ? '' : c[2](o[c[0]])) : o[c[0]])).join(';'));
@@ -1434,19 +1461,19 @@ Object.assign(ACTIONS, {
     qaCall('manutencaoResponder', { protocolo: o.protocolo, socorro: d.man_socorro, parecer: d.man_parecer || '', lancado: d.man_socorro === 'sim' && d.man_lancado === 'sim', fluig: d.man_socorro === 'sim' ? (d.man_fluig || '') : '' }, 'Resposta enviada à Qualidade.');
   },
   qaManLancar() { const o = findOcc(state.qa.detail); if (o) qaCall('manutencaoLancar', { protocolo: o.protocolo, fluig: state.qa.drafts.man_fluig || '' }, 'Lançamento registrado. A Qualidade foi avisada.'); },
-  qaCobrar() { const o = findOcc(state.qa.detail); if (o) qaCall('cobrar', { protocolo: o.protocolo, mensagem: state.qa.drafts.cob_msg || '' }, 'Cobrança enviada à Manutenção.'); },
-  async qaCobrarRapido(ds) {
-    if (state.busy) return; state.busy = true; render();
-    const r = await API.call('cobrar', { protocolo: ds.id }); state.busy = false;
-    if (r.ok) { upsertOcc(r.data.ocorrencia); toast('Cobrança enviada à Manutenção.'); }
-    else if (r.code === 'AUTH') return doLogout(r.message); else toast(r.message || 'Não foi possível cobrar.', 'error');
-    render();
-  },
+  qaCobToggle(ds) { const off = state.qa.cobOff; off[ds.id] = !off[ds.id]; render(); },
+  async qaEmailLote() { const off = state.qa.cobOff || {}; await enviarEmailCobranca(cobrancaLista().filter(o => !off[o.protocolo]).map(o => o.protocolo)); },
+  qaFinVer(ds) { state.qa.drafts.fin_ver = ds.v; renderOverlays(); },
   qaFinalizar() {
     const o = findOcc(state.qa.detail), d = state.qa.drafts; if (!o) return;
+    const ver = d.fin_ver == null ? (o.manut_socorro || '') : d.fin_ver;
+    if (!ver) return toast('Escolha: foi socorro ou não foi socorro.', 'error');
     const num = String(d.fin_num == null ? (o.manut_fluig || '') : d.fin_num).trim();
-    if (o.manut_socorro === 'sim' && !num) return toast('Informe o nº do Fluig para finalizar.', 'error');
-    qaCall('finalizar', { protocolo: o.protocolo, numero: num, observacao: d.fin_obs || '' }, 'Ocorrência finalizada.');
+    if (ver === 'sim' && !num) return toast('Informe o nº do Fluig para finalizar.', 'error');
+    qaCall('finalizar', { protocolo: o.protocolo, veredito: ver, numero: ver === 'sim' ? num : '', retorno: d.fin_ret == null ? (o.manut_parecer || '') : d.fin_ret, observacao: d.fin_obs || '' }, ver === 'sim' ? 'Veredito registrado: foi socorro.' : 'Veredito registrado: não foi socorro.');
+  },
+  async qaEmailUm() {
+    const o = findOcc(state.qa.detail); if (!o) return; await enviarEmailCobranca([o.protocolo]);
   },
   qaDevolverOpen() { state.qa.drafts.dev_msg = ''; state.modal = { type: 'devolver', id: state.qa.detail }; renderOverlays(); },
   qaDevolverSend() {

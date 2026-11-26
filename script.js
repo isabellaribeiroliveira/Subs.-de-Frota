@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 const CFG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbywA9MaxKO1yf1XV5OZXDztlrRSGNnaotI58vatv1JQczAgkmbLIXGtd8u_-Yy-CzoP/exec',
+  API_URL: '',
   REFRESH_MS: 45000,     // atualização automática dos dados (ms)
   MAX_ANEXO_MB: 6,       // tamanho máximo de cada anexo
   MAX_ANEXOS: 5          // anexos por ocorrência
@@ -56,10 +56,9 @@ const API = window.UnivaleAPI;
 
 /* ------------------------- Constantes ------------------------- */
 const MESMO_MOTORISTA = 'Mesmo motorista';
-const MOTIVOS = [
-  { v: 'Falha mecânica', i: 'cog' }, { v: 'Falha elétrica', i: 'zap' }, { v: 'Pneu', i: 'circle-dot' },
-  { v: 'Ar-condicionado', i: 'snowflake' }, { v: 'Carroceria', i: 'car-front' }, { v: 'Combustível', i: 'fuel' },
-  { v: 'Sistema/equipamento', i: 'monitor' }, { v: 'Outro', i: 'ellipsis' }
+const MOTIVOS = [   // as opções que o formulário de hoje já usa
+  { v: 'Falha do equipamento', i: 'cog' }, { v: 'Logística do transportes', i: 'truck' }, { v: 'Acidente', i: 'triangle-alert' },
+  { v: 'Abastecimento', i: 'fuel' }, { v: 'Outro', i: 'ellipsis' }
 ];
 const TIPOS_IMPACTO = ['Atraso', 'Horário não cumprido', 'Viagem interrompida', 'Outro'];
 const TIPOS_REMOCAO = ['Reboque', 'Guincho', 'Outro'];
@@ -205,9 +204,8 @@ const FLOW = [
 
   { id: 'motivo', sec: 'Motivo', type: 'motivo', k: 'motivo', title: 'Qual foi o motivo da ocorrência?' },
   { id: 'motivo_desc', sec: 'Motivo', type: 'fields',
-    title: d => d.motivo === 'Outro' ? 'Descreva o motivo' : 'Quer detalhar o que aconteceu?',
-    sub: d => d.motivo === 'Outro' ? 'Explique qual foi o motivo da ocorrência.' : 'Opcional. Ajuda a Qualidade a entender o problema.',
-    fields: [{ k: 'descricao_motivo', label: 'Descrição do motivo', kind: 'area', ph: 'Ex.: Pneu traseiro direito furado.', optional: d => d.motivo !== 'Outro' }] },
+    title: 'Descreva o motivo', sub: 'Conte o que aconteceu com o veículo. Ajuda a Manutenção e a Qualidade a avaliar.',
+    fields: [{ k: 'descricao_motivo', label: 'Descrição do motivo', kind: 'area', ph: 'Ex.: Pneu traseiro direito furado.' }] },
 
   { id: 'obs', sec: 'Fechamento', type: 'obs', title: 'Há alguma informação complementar?', sub: 'Opcional. Você pode anexar fotos ou arquivos.' },
   { id: 'review', sec: 'Fechamento', type: 'review', title: 'Confira sua ocorrência', sub: 'Se estiver tudo certo, é só enviar.' }

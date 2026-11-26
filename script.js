@@ -4,7 +4,7 @@
    ========================================================= */
 'use strict';
 const CFG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbzt1n1zMBTtc9UHMXRMV78CNLrEppN73oYfKus7vDXauOdbYhqtR3nGKSN0j0eY1sAw/exec',
+  API_URL: '',
   REFRESH_MS: 45000,     // atualização automática dos dados (ms)
   MAX_ANEXO_MB: 6,       // tamanho máximo de cada anexo
   MAX_ANEXOS: 5          // anexos por ocorrência
@@ -163,14 +163,12 @@ function loadCache() {
    quando a resposta anterior pede.
    ========================================================= */
 const FLOW = [
-  { id: 'veic_mot', sec: 'Identificação', type: 'fields', title: 'Qual é o veículo e quem estava dirigindo?', sub: 'Digite ou escolha na lista.',
+  { id: 'veic_mot', sec: 'Identificação', type: 'fields', title: 'Qual é o veículo e quem estava dirigindo?', sub: 'Escolha o veículo na lista e digite o nome do motorista.',
     fields: [
       { k: 'veiculo', label: 'Veículo', kind: 'combo', list: 'veiculos', ph: 'Ex.: 1234' },
-      { k: 'motorista', label: 'Motorista', kind: 'combo', list: 'motoristas', ph: 'Nome do motorista' }] },
-  { id: 'setor_linha', sec: 'Identificação', type: 'fields', title: 'Qual é o setor e a linha?',
-    fields: [
-      { k: 'setor', label: 'Setor', kind: 'pills', list: 'setores', ph: 'Ex.: Fretamento' },
-      { k: 'linha', label: 'Linha', kind: 'combo', list: 'linhas', ph: 'Ex.: 501 - Centro / Bairro' }] },
+      { k: 'motorista', label: 'Motorista', kind: 'text', ph: 'Nome do motorista' }] },
+  { id: 'linha', sec: 'Identificação', type: 'fields', title: 'Em qual linha?',
+    fields: [{ k: 'linha', label: 'Linha', kind: 'combo', list: 'linhas', ph: 'Ex.: 501 - Centro / Bairro' }] },
   { id: 'quando', sec: 'Identificação', type: 'fields', title: 'Quando aconteceu?', sub: 'Já preenchemos com a data e a hora de agora. Ajuste se foi antes.',
     fields: [{ k: 'data', label: 'Data', kind: 'date' }, { k: 'hora', label: 'Horário', kind: 'time' }] },
   { id: 'onde', sec: 'Identificação', type: 'fields', title: 'Onde aconteceu?',
@@ -192,7 +190,7 @@ const FLOW = [
   { id: 'substituto', sec: 'Substituição', type: 'fields', title: 'Qual veículo e qual motorista assumiram?', when: d => d.houve_substituicao === 'sim',
     fields: [
       { k: 'veiculo_substituto', label: 'Veículo substituto', kind: 'combo', list: 'veiculos', ph: 'Ex.: 5678' },
-      { k: 'motorista_substituto', label: 'Motorista substituto', kind: 'combo', list: 'motoristas', ph: 'Nome do motorista', mesmo: true }] },
+      { k: 'motorista_substituto', label: 'Motorista substituto', kind: 'text', ph: 'Nome do motorista', mesmo: true }] },
   { id: 'local_subst', sec: 'Substituição', type: 'fields', title: 'Onde foi feita a substituição?', when: d => d.substituicao_fora_ponto_apoio === 'sim',
     fields: [
       { k: 'local_substituicao', label: 'Local da substituição', kind: 'text', ph: 'Ex.: Av. Central, 500' },
@@ -224,7 +222,7 @@ const FORM_KEYS = ['data', 'hora', 'veiculo', 'setor', 'linha', 'motorista', 'ci
 function blankData() {
   const d = {}; FORM_KEYS.forEach(k => d[k] = '');
   d.data = todayISO(); d.hora = nowHM();
-  d.setor = (state.user && state.user.setor) || '';
+  d.setor = (state.user && state.user.filial) || '';   // setor = filial
   d.cidade = lsGet('univale_last_cidade', '') || '';
   return d;
 }
@@ -312,7 +310,7 @@ function sections(o) {
   const rows = (arr) => arr.filter(r => r[1] !== '' && r[1] !== '—' && r[1] !== undefined && r[1] !== null);
   const local = [o.cidade, o.bairro, o.local_especifico].filter(Boolean).join(' · ');
   const out = [
-    { t: 'Identificação', step: 'veic_mot', rows: rows([['Veículo', o.veiculo], ['Motorista', o.motorista], ['Setor', o.setor], ['Linha', o.linha],
+    { t: 'Identificação', step: 'veic_mot', rows: rows([['Veículo', o.veiculo], ['Motorista', o.motorista], ['Filial', o.setor], ['Linha', o.linha],
       ['Quando', fmtDate(o.data) + ' às ' + o.hora], ['Local', local]]) },
     { t: 'Impacto', step: 'passageiros', rows: rows([['Passageiros no veículo', yn(o.possui_passageiros)],
       o.possui_passageiros === 'sim' ? ['Baldeio', yn(o.houve_baldeio)] : ['', ''],
@@ -505,7 +503,7 @@ function fieldHtml(f, d) {
     return `<div class="field">${lbl}${toggle}<button type="button" id="f-${f.k}" class="picker${bad}${v ? ' has' : ''}" data-action="openPicker" data-k="${f.k}" data-list="${f.list}" data-title="${esc(f.label)}" ${mesmo ? 'disabled' : ''}>
       <span>${v ? esc(v) : 'Selecionar ' + esc(f.label.toLowerCase())}</span>${ic('chevron-down', 20)}</button>${em}</div>`;
   }
-  return `<div class="field">${lbl}${toggle}<input id="f-${f.k}" class="inp${bad}" data-bind="${f.k}" value="${esc(v)}" placeholder="${esc(f.ph || '')}" autocomplete="off"${mesmo ? ' readonly' : ''} />${lista.length ? '' : `<p class="tiny muted hint">A lista de ${esc(f.label.toLowerCase())} ainda não foi cadastrada pela Qualidade.</p>`}${em}</div>`;
+  return `<div class="field">${lbl}${toggle}<input id="f-${f.k}" class="inp${bad}" data-bind="${f.k}" value="${esc(v)}" placeholder="${esc(f.ph || '')}" autocomplete="off"${mesmo ? ' readonly' : ''} />${(f.kind === 'combo' && !lista.length) ? `<p class="tiny muted hint">A lista de ${esc(f.label.toLowerCase())} ainda não foi cadastrada pela Qualidade.</p>` : ''}${em}</div>`;
 }
 function wizSteps(vis, idx) {       // estado de cada seção: concluída / atual / a fazer
   return SECOES.map(sec => {
@@ -651,10 +649,11 @@ function renderOverlays() {
   document.body.classList.toggle('no-scroll', !!html);
 }
 function normTxt(x) { return String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+const chaveBusca = x => normTxt(x).replace(/[^a-z0-9]/g, '');
 function pickerFiltered() {
-  const p = state.picker, q = normTxt(p.q).trim(), lista = state.listas[p.list] || [];
-  const itens = q ? lista.filter(x => normTxt(x).includes(q)) : lista.slice();
-  if (q) itens.sort((a, b) => (normTxt(a).startsWith(q) ? 0 : 1) - (normTxt(b).startsWith(q) ? 0 : 1));
+  const p = state.picker, q = chaveBusca(p.q), lista = state.listas[p.list] || [];
+  const itens = q ? lista.filter(x => chaveBusca(x).includes(q)) : lista.slice();
+  if (q) itens.sort((a, b) => (chaveBusca(a).startsWith(q) ? 0 : 1) - (chaveBusca(b).startsWith(q) ? 0 : 1));
   return itens;
 }
 function pickerItems() {
@@ -1067,7 +1066,7 @@ function qaTable(list, opts) {
     ['Quando', !opts.compact, o => `<td data-l="Quando">${fmtDate(o.data)} <small>${esc(o.hora)}</small></td>`],
     ['Veículo', true, o => `<td data-l="Veículo">${esc(o.veiculo)}</td>`],
     ['Filial', qual, o => `<td data-l="Filial">${esc(o.filial)}</td>`],
-    ['Setor · Linha', !opts.compact, o => `<td data-l="Setor · Linha">${esc(o.setor)}<small>${esc(o.linha)}</small></td>`],
+    ['Linha', !opts.compact, o => `<td data-l="Linha">${esc(o.linha)}</td>`],
     ['Motivo', true, o => `<td data-l="Motivo"><span class="mi">${motivoIcon(o.motivo, 16)}</span> ${esc(o.motivo)}</td>`],
     ['Nº Fluig', !opts.compact, o => `<td data-l="Nº Fluig" class="mono${o.numero_socorro ? '' : ' nosoc'}">${o.numero_socorro ? esc(o.numero_socorro) : '<span class="dash">—</span>'}</td>`],
     ['Há', true, o => `<td data-l="Há"><span class="age ${(inQueue(o, perfil()) && Date.now() - new Date(o.criado_em) > 3600000) ? 'late' : ''}">${ago(o.criado_em)}</span></td>`],
@@ -1154,7 +1153,7 @@ function qaFiltersPanel() {
   const linhas = uniqueSorted([].concat(state.listas.linhas || [], state.occs.map(o => o.linha)));
   const statusOpts = Object.keys(STATUS).map(k => [k, STATUS[k].qa]);
   return `<div class="filters"><label class="fl"><span>De</span><input type="date" data-filter="from" value="${esc(f.from)}"></label><label class="fl"><span>Até</span><input type="date" data-filter="to" value="${esc(f.to)}"></label>
-    ${perfil() === 'qualidade' ? sel('filial', 'Filial', uniqueSorted([].concat(state.listas.filiais || [], state.occs.map(o => o.filial)))) : ''}${sel('status', 'Status', statusOpts)}${sel('setor', 'Setor', setores)}${sel('linha', 'Linha', linhas)}${sel('motivo', 'Motivo', MOTIVOS.map(m => m.v))}
+    ${perfil() === 'qualidade' ? sel('filial', 'Filial', uniqueSorted([].concat(state.listas.filiais || [], state.occs.map(o => o.filial)))) : ''}${sel('status', 'Status', statusOpts)}${sel('linha', 'Linha', linhas)}${sel('motivo', 'Motivo', MOTIVOS.map(m => m.v))}
     ${sel('impacto', 'Impacto no horário', [['sim', 'Sim'], ['nao', 'Não']])}${sel('subst', 'Substituição', [['sim', 'Sim'], ['nao', 'Não']])}
     <div class="fl end"><button class="btn btn-ghost btn-sm" data-action="qaClear">Limpar filtros</button></div></div>`;
 }
@@ -1210,7 +1209,7 @@ function qaRelatorios() {
       <section class="panel"><header><h2>Veículos reincidentes <small>mais ocorrências</small></h2></header><div class="pad">${bars(countBy(list, o => o.veiculo).slice(0, 8))}</div></section></div></div>`;
 }
 
-const CAD_TABS = [['veiculos', 'Veículos', 'bus', 'veículo'], ['motoristas', 'Motoristas', 'user', 'motorista'], ['linhas', 'Linhas', 'route', 'linha'], ['setores', 'Setores', 'id-card', 'setor']];
+const CAD_TABS = [['veiculos', 'Veículos', 'bus', 'veículo'], ['linhas', 'Linhas', 'route', 'linha']];
 function cadItems() {
   const c = state.qa.cad, q = normTxt(c.q).trim();
   const lista = (state.listas[c.tab] || []).filter(x => !q || normTxt(x).includes(q));
